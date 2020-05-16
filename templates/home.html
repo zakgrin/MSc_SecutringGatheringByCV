@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Home</title>
+</head>
+<body>
+    <h1>These are the top 10 words ordred by count:</h1>
+    <div id="content"></div>
+    <table>
+        <tr>
+            <th>Word</th>
+            <th>Count</th>
+        </tr>
+        {% for word, count in top_list %}
+        <tr>
+            <td>{{word}}</td>
+            <td>{{count}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <script type="text/javascript">
+        document.getElementById("content").innerHTML = "Booyah!";
+    </script>
+</body>
+</html>
