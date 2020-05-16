@@ -10,6 +10,7 @@ itsdangerous==1.1.0
 Jinja2==2.11.2
 MarkupSafe==1.1.1
 numpy==1.18.4
+opencv-contrib-python==4.2.0.34
 Pillow==7.1.2
 scipy==1.4.1
 six==1.14.0
