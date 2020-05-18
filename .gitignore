@@ -1,4 +1,7 @@
-/Lib/**
-/Scripts/**
-/.idea/**
+/Lib
+/Scripts
+/.idea
 /pyvenv.cfg
+/venv
+/words.db
+/detect_imgs_results_onnx

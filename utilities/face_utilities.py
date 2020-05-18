@@ -30,14 +30,16 @@ def find_face_locations(image, enumerate_faces=False, report=False, face_detecto
     # Create draw object
     draw = PIL.ImageDraw.Draw(pil_image)
     # Draw text on top of the image
-    font = PIL.ImageFont.truetype("arial.ttf", 20)
+    #font = PIL.ImageFont.truetype("arial.ttf", 20)
+    font = PIL.ImageFont.load_default()
 
     if enumerate_faces:
         draw.text((10, 10),
                   "Number of Faces = {} ({} seconds)".format(number_of_faces, processing_time),
                   fill='blue', font=font)
 
-    font = PIL.ImageFont.truetype("arial.ttf", 14)
+    #font = PIL.ImageFont.truetype("arial.ttf", 14)
+    font = PIL.ImageFont.load_default()
     i = 1
 
     for face_location in face_locations:
@@ -78,14 +80,16 @@ def find_face_landmarks(image, enumerate_faces=False, report=False, face_landmar
     # Create draw object
     draw = PIL.ImageDraw.Draw(pil_image)
     # Draw text on top of the image
-    font = PIL.ImageFont.truetype("arial.ttf", 20)
+    #font = PIL.ImageFont.truetype("arial.ttf", 20)
+    font = PIL.ImageFont.load_default()
 
     if enumerate_faces:
         draw.text((10, 10),
                   "Number of Faces = {} ({} seconds)".format(number_of_faces, processing_time),
                   fill='blue', font=font)
 
-    font = PIL.ImageFont.truetype("arial.ttf", 14)
+    #font = PIL.ImageFont.truetype("arial.ttf", 14)
+    font = PIL.ImageFont.load_default()
     i = 1
 
     for face_landmarks in face_landmarks_list:
