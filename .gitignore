@@ -4,4 +4,4 @@
 /pyvenv.cfg
 /venv
 /words.db
-/detect_imgs_results_onnx
+/imgs_result/
