@@ -1,6 +1,7 @@
 import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
+import keyboard
 import cv2
 import face_recognition
 import time
@@ -20,7 +21,7 @@ import utilities.face_utilities
 import onnxruntime as ort
 
 
-def find_face_locations(image_path, report=False, face_detector="ultra-light"):
+def find_face_locations(image_path, report=False, show_images=True, face_detector="ultra-light"):
     """
     :param report:
     :param image: An image (as a numpy array)
@@ -50,12 +51,12 @@ def find_face_locations(image_path, report=False, face_detector="ultra-light"):
         report_values = (number_of_faces, processing_time)
         if face_detector == 'ultra-light':
             face_locations = order_face_locations(face_locations)
-        draw_face_locations(image, face_locations, report_values, lib='pil', enumerate_faces=True)
+        draw_face_locations(image, face_locations, report_values, show_images, lib='pil', enumerate_faces=True)
 
     return face_locations
 
 
-def draw_face_locations(image, face_locations, report_values=None, lib='pil', enumerate_faces=False):
+def draw_face_locations(image, face_locations, report_values, lib='pil', show_images=True, save_images=True, enumerate_faces=False):
     """
 
     :param enumerate_faces: Show number of the face according to detection order
@@ -64,7 +65,7 @@ def draw_face_locations(image, face_locations, report_values=None, lib='pil', en
     if report_values:
         (number_of_faces, processing_time) = report_values
 
-    if lib == 'pil':
+    if lib == 'pil' and (show_images or save_images):
         # Load the image into a Python Image Library object so that we can draw on top of it and display it
         pil_image = PIL.Image.fromarray(image)
         # Create draw object
@@ -98,9 +99,19 @@ def draw_face_locations(image, face_locations, report_values=None, lib='pil', en
                 i += 1
 
         # Display the image on screen
-        pil_image.show()
+        if show_images:
+            ''' # slow !
+            pil_image.show()
+            os.wait()
+            '''
+            image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_BGR2RGB)
+            cv2.imshow('image', image)
+            cv2.waitKey(0)
+            #cv2.destroyAllWindows()
+        if save_images:
+            pass
 
-    else: # cv2
+    elif lib =='cv2' and (show_images or save_images):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         if enumerate_faces:
@@ -131,18 +142,17 @@ def draw_face_locations(image, face_locations, report_values=None, lib='pil', en
                             2)
                 i += 1
         # Display the image on screen
-        cv2.imshow('image', image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        if show_images:
+            cv2.imshow('image', image)
+            cv2.waitKey(0)
+            #cv2.destroyAllWindows()
+        if save_images:
+            pass
+    #else:
+    #    print('The image was not annotated')
 
 def order_face_locations(face_locations):
     # TODO: we may not need order!
-    #stime = time.time()
-    # for i in range(len(face_locations)):
-    #     top, right, bottom, left = face_locations[i]
-    #     face_locations[i] = [right, bottom, left, top]
-    #period = time.time() - stime
-    #print('ordering time', period)
     return [[right,bottom,left,top] for [top,right,bottom,left] in face_locations]
 
 
@@ -237,7 +247,7 @@ def predict(width, height, confidences, boxes, prob_threshold, iou_threshold=0.3
 def onnx_image_preprocessing(image, lib='cv2'):
 
     if lib == 'cv2':
-        # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Add if there is a problem with the model predict
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Add if there is a problem with the model predict
         processed_image = cv2.resize(image, (640, 480))
         image_mean = np.array([127, 127, 127])
         processed_image = (processed_image - image_mean) / 128
@@ -254,29 +264,81 @@ def onnx_image_preprocessing(image, lib='cv2'):
         processed_image = np.expand_dims(processed_image, axis=0)
         processed_image = processed_image.astype(np.float32)
 
-    return processed_image
+    return processed_image, image
 
-def face_locations_onnx(image):
+def onnx_image_path_preprocessing(image_path, lib='cv2'):
 
-    # label_path = "models/voc-model-labels.txt"
-    # class_names = [name.strip() for name in open(label_path).readlines()]
+    if lib == 'cv2':
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Add if there is a problem with the model predict
+        processed_image = cv2.resize(image, (640, 480))
+        image_mean = np.array([127, 127, 127])
+        processed_image = (processed_image - image_mean) / 128
+        processed_image = np.transpose(processed_image, [2, 0, 1])
+        processed_image = np.expand_dims(processed_image, axis=0)
+        processed_image = processed_image.astype(np.float32)
+
+    elif lib == 'pil':
+        image = face_recognition.load_image_file(image_path)
+        processed_image = PIL.Image.fromarray(image)
+        processed_image = processed_image.resize((640, 480))
+        image_mean = np.array([127, 127, 127])
+        processed_image = (processed_image - image_mean) / 128
+        processed_image = np.transpose(processed_image, [2, 0, 1])
+        processed_image = np.expand_dims(processed_image, axis=0)
+        processed_image = processed_image.astype(np.float32)
+
+    return processed_image, image
+
+
+def face_locations_onnx(images_folder, lib='pil', report=True, show_images=True, save_images=True):
+
+    label_path = "models/voc-model-labels.txt"
+    class_names = [name.strip() for name in open(label_path).readlines()]
 
     onnx_path = "models/onnx/fixed_version-RFB-640.onnx"
     predictor = onnx.load(onnx_path)
     onnx.checker.check_model(predictor)
     onnx.helper.printable_graph(predictor.graph)
     predictor = backend.prepare(predictor, device="CPU")  # default CPU
-
     ort_session = ort.InferenceSession(onnx_path)
     input_name = ort_session.get_inputs()[0].name
 
     threshold = 0.7
-    sum = 0
+    total_processing_time = 0
 
-    processed_image = onnx_image_preprocessing(image, lib='cv2')
+    result_path = images_folder+"_result"
 
-    confidences, boxes = ort_session.run(None, {input_name: processed_image})
-    face_locations, labels, probs = predict(image.shape[1], image.shape[0], confidences, boxes, threshold)
+    if not os.path.exists(result_path):
+        os.makedirs(result_path)
+    listdir = os.listdir(images_folder)
 
-    return face_locations
+    if report:
+        print('-'*60)
+        print("{:<20s}{:>20s}{:>20s}".format('image-file','num-of-faces','process-time(sec)'))
+        print('-'*60)
 
+    for image_file in listdir:
+
+        start_time = time.time()
+
+        image_path = os.path.join(images_folder, image_file)
+        processed_image, image = onnx_image_path_preprocessing(image_path, lib='cv2')
+        confidences, boxes = ort_session.run(None, {input_name: processed_image})
+        face_locations, labels, probs = predict(image.shape[1], image.shape[0], confidences, boxes, threshold)
+
+        # Find number of faces
+        number_of_faces = len(face_locations)
+
+        processing_time = round((time.time() - start_time), 2)
+        total_processing_time += processing_time
+
+
+        if report:
+            print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
+
+        report_values = (number_of_faces, processing_time)
+        face_locations = order_face_locations(face_locations)
+        draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, enumerate_faces=True)
+
+    print("Total processing time (seconds): ", round(total_processing_time, 2))
