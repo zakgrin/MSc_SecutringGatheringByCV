@@ -63,7 +63,7 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
     """
     # report values
     if report_values:
-        (number_of_faces, processing_time) = report_values
+        (image_path, number_of_faces, processing_time) = report_values
 
     if lib == 'pil' and (show_images or save_images):
         # Load the image into a Python Image Library object so that we can draw on top of it and display it
@@ -109,7 +109,7 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
             cv2.waitKey(0)
             #cv2.destroyAllWindows()
         if save_images:
-            pass
+            pil_image.save(image_path)
 
     elif lib =='cv2' and (show_images or save_images):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -147,7 +147,7 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
             cv2.waitKey(0)
             #cv2.destroyAllWindows()
         if save_images:
-            pass
+            cv2.imwrite(image_path, image)
     #else:
     #    print('The image was not annotated')
 
@@ -307,10 +307,10 @@ def face_locations_onnx(images_folder, lib='pil', report=True, show_images=True,
     threshold = 0.7
     total_processing_time = 0
 
-    result_path = images_folder+"_result"
+    images_folder_result = images_folder+"_result"
 
-    if not os.path.exists(result_path):
-        os.makedirs(result_path)
+    if not os.path.exists(images_folder_result):
+        os.makedirs(images_folder_result)
     listdir = os.listdir(images_folder)
 
     if report:
@@ -323,6 +323,7 @@ def face_locations_onnx(images_folder, lib='pil', report=True, show_images=True,
         start_time = time.time()
 
         image_path = os.path.join(images_folder, image_file)
+        result_image_path = os.path.join(images_folder_result, image_file)
         processed_image, image = onnx_image_path_preprocessing(image_path, lib='cv2')
         confidences, boxes = ort_session.run(None, {input_name: processed_image})
         face_locations, labels, probs = predict(image.shape[1], image.shape[0], confidences, boxes, threshold)
@@ -337,7 +338,7 @@ def face_locations_onnx(images_folder, lib='pil', report=True, show_images=True,
         if report:
             print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
 
-        report_values = (number_of_faces, processing_time)
+        report_values = (result_image_path, number_of_faces, processing_time)
         face_locations = order_face_locations(face_locations)
         draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, enumerate_faces=True)
 
