@@ -1,12 +1,8 @@
 import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
-import keyboard
-import cv2
 import face_recognition
-import time
 from utilities import detect_imgs_onnx
-
 import os
 import time
 import PIL
@@ -62,8 +58,11 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
     :param enumerate_faces: Show number of the face according to detection order
     """
     # report values
-    if report_values:
+    if len(report_values) == 4:
+        (image_path, number_of_faces, processing_time, labels_probs) = report_values
+    elif len(report_values) == 3:
         (image_path, number_of_faces, processing_time) = report_values
+        labels_probs = [f"face(?)" for i in range(number_of_faces)]
 
     if lib == 'pil' and (show_images or save_images):
         # Load the image into a Python Image Library object so that we can draw on top of it and display it
@@ -81,22 +80,20 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
                       fill='blue',
                       font=font)
 
-        i = 1
-        for face_location in face_locations:
+        for i in range(len(face_locations)):
             # Print the location of each face in this image.
             # Each face is a list of co-ordinates in (top, right, bottom, left) order.
-            top, right, bottom, left = face_location
+            top, right, bottom, left = face_locations[i]
             # Let's draw a box around the face
             draw.rectangle([left, top, right, bottom], outline="red", width=5)
             # TODO: here the text rectangle boox has to be equal to all faces but as ration to adjust to face size
             draw.rectangle([left, bottom, right, bottom+int(0.3*(bottom-top))], fill="red", outline="red", width=5)
             if enumerate_faces:
-                text = "Face {}".format(i)
+                text = "{}.{}".format(i+1, labels_probs[i])
                 draw.text((left, bottom),
                           text,
                           fill='blue',
                           font=font)
-                i += 1
 
         # Display the image on screen
         if show_images:
@@ -124,23 +121,22 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
                         (255, 0, 0),
                         2)
 
-        i = 1
-        for face_location in face_locations:
+        for i in range(len(face_locations)):
             # Print the location of each face in this image.
             # Each face is a list of co-ordinates in (top, right, bottom, left) order.
-            top, right, bottom, left = face_location
+            top, right, bottom, left = face_locations[i]
             # Let's draw a box around the face
             cv2.rectangle(image, (left, top), (right, bottom), color=(0, 0, 255), thickness=5)
             # cv2.rectangle(image, (top, left), (bottom, right), color=(0, 0, 255), thickness=5)
             if enumerate_faces:
-                text = "Face {}".format(i)
+                text = "{}.{}".format(i+1, labels_probs[i])
                 cv2.putText(image, text,
                             (left, int(bottom+(0.2*(bottom-top)))),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.6,
                             (255, 0, 0),
                             2)
-                i += 1
+
         # Display the image on screen
         if show_images:
             cv2.imshow('image', image)
@@ -150,6 +146,7 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
             cv2.imwrite(image_path, image)
     #else:
     #    print('The image was not annotated')
+
 
 def order_face_locations(face_locations):
     # TODO: we may not need order!
@@ -214,7 +211,6 @@ def find_face_landmarks(image, enumerate_faces=False, report=False, face_landmar
     return face_landmarks_list
 
 
-
 def predict(width, height, confidences, boxes, prob_threshold, iou_threshold=0.3, top_k=-1):
     boxes = boxes[0]
     confidences = confidences[0]
@@ -244,28 +240,6 @@ def predict(width, height, confidences, boxes, prob_threshold, iou_threshold=0.3
     return picked_box_probs[:, :4].astype(np.int32), np.array(picked_labels), picked_box_probs[:, 4]
 
 
-def onnx_image_preprocessing(image, lib='cv2'):
-
-    if lib == 'cv2':
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Add if there is a problem with the model predict
-        processed_image = cv2.resize(image, (640, 480))
-        image_mean = np.array([127, 127, 127])
-        processed_image = (processed_image - image_mean) / 128
-        processed_image = np.transpose(processed_image, [2, 0, 1])
-        processed_image = np.expand_dims(processed_image, axis=0)
-        processed_image = processed_image.astype(np.float32)
-
-    elif lib == 'pil':
-        processed_image = PIL.Image.fromarray(image)
-        processed_image = processed_image.resize((640, 480))
-        image_mean = np.array([127, 127, 127])
-        processed_image = (processed_image - image_mean) / 128
-        processed_image = np.transpose(processed_image, [2, 0, 1])
-        processed_image = np.expand_dims(processed_image, axis=0)
-        processed_image = processed_image.astype(np.float32)
-
-    return processed_image, image
-
 def onnx_image_path_preprocessing(image_path, lib='cv2'):
 
     if lib == 'cv2':
@@ -291,7 +265,7 @@ def onnx_image_path_preprocessing(image_path, lib='cv2'):
     return processed_image, image
 
 
-def face_locations_onnx(images_folder, lib='pil', report=True, show_images=True, save_images=True):
+def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=True, save_images=True):
 
     label_path = "models/voc-model-labels.txt"
     class_names = [name.strip() for name in open(label_path).readlines()]
@@ -327,7 +301,6 @@ def face_locations_onnx(images_folder, lib='pil', report=True, show_images=True,
         processed_image, image = onnx_image_path_preprocessing(image_path, lib='cv2')
         confidences, boxes = ort_session.run(None, {input_name: processed_image})
         face_locations, labels, probs = predict(image.shape[1], image.shape[0], confidences, boxes, threshold)
-
         # Find number of faces
         number_of_faces = len(face_locations)
 
@@ -338,8 +311,57 @@ def face_locations_onnx(images_folder, lib='pil', report=True, show_images=True,
         if report:
             print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
 
-        report_values = (result_image_path, number_of_faces, processing_time)
+        labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(number_of_faces)]
+        report_values = (result_image_path, number_of_faces, processing_time, labels_probs)
         face_locations = order_face_locations(face_locations)
+        draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, enumerate_faces=True)
+
+    print("Total processing time (seconds): ", round(total_processing_time, 2))
+
+
+def find_face_locations_fr(images_folder, lib='pil', report=True, show_images=True, save_images=True):
+    """
+    :param report:
+    :param image: An image (as a numpy array)
+    :param face_detector:   - "hog" is less accurate but faster on CPUs.
+                            - "cnn" is a more accurate deep-learning model which is GPU/CUDA accelerated (if available).
+                            - The default is "hog".
+    :return: face_locations
+    """
+
+    total_processing_time = 0
+    images_folder_result = images_folder + "_result"
+
+    if not os.path.exists(images_folder_result):
+        os.makedirs(images_folder_result)
+    listdir = os.listdir(images_folder)
+
+    if report:
+        print('-' * 60)
+        print("{:<20s}{:>20s}{:>20s}".format('image-file', 'num-of-faces', 'process-time(sec)'))
+        print('-' * 60)
+
+    for image_file in listdir:
+
+        start_time = time.time()
+
+        image_path = os.path.join(images_folder, image_file)
+        result_image_path = os.path.join(images_folder_result, image_file)
+
+        image = face_recognition.load_image_file(image_path)
+        face_locations = face_recognition.face_locations(image, model='hog')
+
+        # Find number of faces
+        number_of_faces = len(face_locations)
+
+        processing_time = round((time.time() - start_time), 2)
+        total_processing_time += processing_time
+
+        if report:
+            print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
+
+        #labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(number_of_faces)]
+        report_values = (result_image_path, number_of_faces, processing_time)#, labels_probs)
         draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, enumerate_faces=True)
 
     print("Total processing time (seconds): ", round(total_processing_time, 2))
