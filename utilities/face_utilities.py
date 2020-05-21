@@ -32,7 +32,7 @@ def find_face_locations(image_path, report=False, show_images=True, face_detecto
     if report: start_time = time.time()
 
     # Find all the faces in the image
-    if face_detector in ['hog','cnn']:
+    if face_detector in ['hog', 'cnn']:
         face_locations = face_recognition.face_locations(image, model=face_detector)
     elif face_detector == 'ultra-light':
         face_locations = face_locations_onnx(image)
@@ -52,7 +52,8 @@ def find_face_locations(image_path, report=False, show_images=True, face_detecto
     return face_locations
 
 
-def draw_face_locations(image, face_locations, report_values, lib='pil', show_images=True, save_images=True, enumerate_faces=False):
+def draw_face_locations(image, face_locations, report_values, lib='pil', show_images=True, save_images=True,
+                        enumerate_faces=False):
     """
 
     :param enumerate_faces: Show number of the face according to detection order
@@ -71,7 +72,7 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
         draw = PIL.ImageDraw.Draw(pil_image)
         # Draw text on top of the image
         font_list = ["arial.ttf", "handwriting-markervalerieshand-regular.ttf", "Drawing_Guides.ttf"]
-        font = PIL.ImageFont.truetype("fonts/"+font_list[0], 22)
+        font = PIL.ImageFont.truetype("fonts/" + font_list[0], 22)
 
         if enumerate_faces:
             text = "Number of Faces = {} ({} seconds)".format(number_of_faces, processing_time)
@@ -87,9 +88,10 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
             # Let's draw a box around the face
             draw.rectangle([left, top, right, bottom], outline="red", width=5)
             # TODO: here the text rectangle boox has to be equal to all faces but as ration to adjust to face size
-            draw.rectangle([left, bottom, right, bottom+int(0.3*(bottom-top))], fill="red", outline="red", width=5)
+            draw.rectangle([left, bottom, right, bottom + int(0.3 * (bottom - top))], fill="red", outline="red",
+                           width=5)
             if enumerate_faces:
-                text = "{}.{}".format(i+1, labels_probs[i])
+                text = "{}.{}".format(i + 1, labels_probs[i])
                 draw.text((left, bottom),
                           text,
                           fill='blue',
@@ -104,11 +106,11 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
             image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_BGR2RGB)
             cv2.imshow('image', image)
             cv2.waitKey(0)
-            #cv2.destroyAllWindows()
+            # cv2.destroyAllWindows()
         if save_images:
             pil_image.save(image_path)
 
-    elif lib =='cv2' and (show_images or save_images):
+    elif lib == 'cv2' and (show_images or save_images):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         if enumerate_faces:
@@ -129,9 +131,9 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
             cv2.rectangle(image, (left, top), (right, bottom), color=(0, 0, 255), thickness=5)
             # cv2.rectangle(image, (top, left), (bottom, right), color=(0, 0, 255), thickness=5)
             if enumerate_faces:
-                text = "{}.{}".format(i+1, labels_probs[i])
+                text = "{}.{}".format(i + 1, labels_probs[i])
                 cv2.putText(image, text,
-                            (left, int(bottom+(0.2*(bottom-top)))),
+                            (left, int(bottom + (0.2 * (bottom - top)))),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.6,
                             (255, 0, 0),
@@ -141,16 +143,16 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
         if show_images:
             cv2.imshow('image', image)
             cv2.waitKey(0)
-            #cv2.destroyAllWindows()
+            # cv2.destroyAllWindows()
         if save_images:
             cv2.imwrite(image_path, image)
-    #else:
+    # else:
     #    print('The image was not annotated')
 
 
 def order_face_locations(face_locations):
     # TODO: we may not need order!
-    return [[right,bottom,left,top] for [top,right,bottom,left] in face_locations]
+    return [[right, bottom, left, top] for [top, right, bottom, left] in face_locations]
 
 
 def find_face_landmarks(image, enumerate_faces=False, report=False, face_landmarker="large"):
@@ -178,7 +180,7 @@ def find_face_landmarks(image, enumerate_faces=False, report=False, face_landmar
     # Create draw object
     draw = PIL.ImageDraw.Draw(pil_image)
     # Draw text on top of the image
-    #font = PIL.ImageFont.truetype("arial.ttf", 20)
+    # font = PIL.ImageFont.truetype("arial.ttf", 20)
     font = PIL.ImageFont.load_default()
 
     if enumerate_faces:
@@ -186,7 +188,7 @@ def find_face_landmarks(image, enumerate_faces=False, report=False, face_landmar
                   "Number of Faces = {} ({} seconds)".format(number_of_faces, processing_time),
                   fill='blue', font=font)
 
-    #font = PIL.ImageFont.truetype("arial.ttf", 14)
+    # font = PIL.ImageFont.truetype("arial.ttf", 14)
     font = PIL.ImageFont.load_default()
     i = 1
 
@@ -241,10 +243,9 @@ def predict(width, height, confidences, boxes, prob_threshold, iou_threshold=0.3
 
 
 def onnx_image_path_preprocessing(image_path, lib='cv2'):
-
     if lib == 'cv2':
         image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # Add if there is a problem with the model predict
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Add if there is a problem with the model predict
         processed_image = cv2.resize(image, (640, 480))
         image_mean = np.array([127, 127, 127])
         processed_image = (processed_image - image_mean) / 128
@@ -266,7 +267,6 @@ def onnx_image_path_preprocessing(image_path, lib='cv2'):
 
 
 def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=True, save_images=True):
-
     label_path = "models/voc-model-labels.txt"
     class_names = [name.strip() for name in open(label_path).readlines()]
 
@@ -281,16 +281,22 @@ def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=
     threshold = 0.7
     total_processing_time = 0
 
-    images_folder_result = images_folder+"_result"
+    if not os.path.isdir(images_folder):
+        image_file = os.path.basename(images_folder)
+        images_folder = os.path.dirname(images_folder)
+        listdir = [image_file]
+    else:
+        listdir = os.listdir(images_folder)
+
+    images_folder_result = images_folder + "_result"
 
     if not os.path.exists(images_folder_result):
         os.makedirs(images_folder_result)
-    listdir = os.listdir(images_folder)
 
     if report:
-        print('-'*60)
-        print("{:<20s}{:>20s}{:>20s}".format('image-file','num-of-faces','process-time(sec)'))
-        print('-'*60)
+        print('-' * 60)
+        print("{:<20s}{:>20s}{:>20s}".format('image-file', 'num-of-faces', 'process-time(sec)'))
+        print('-' * 60)
 
     for image_file in listdir:
 
@@ -306,7 +312,6 @@ def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=
 
         processing_time = round((time.time() - start_time), 2)
         total_processing_time += processing_time
-
 
         if report:
             print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
@@ -330,11 +335,18 @@ def find_face_locations_fr(images_folder, lib='pil', report=True, show_images=Tr
     """
 
     total_processing_time = 0
+
+    if not os.path.isdir(images_folder):
+        image_file = os.path.basename(images_folder)
+        images_folder = os.path.dirname(images_folder)
+        listdir = [image_file]
+    else:
+        listdir = os.listdir(images_folder)
+
     images_folder_result = images_folder + "_result"
 
     if not os.path.exists(images_folder_result):
         os.makedirs(images_folder_result)
-    listdir = os.listdir(images_folder)
 
     if report:
         print('-' * 60)
@@ -360,8 +372,8 @@ def find_face_locations_fr(images_folder, lib='pil', report=True, show_images=Tr
         if report:
             print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
 
-        #labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(number_of_faces)]
-        report_values = (result_image_path, number_of_faces, processing_time)#, labels_probs)
+        # labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(number_of_faces)]
+        report_values = (result_image_path, number_of_faces, processing_time)  # , labels_probs)
         draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, enumerate_faces=True)
 
     print("Total processing time (seconds): ", round(total_processing_time, 2))
