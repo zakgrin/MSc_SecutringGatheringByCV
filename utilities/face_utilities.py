@@ -16,7 +16,7 @@ from caffe2.python.onnx import backend
 import onnxruntime as ort
 
 
-def draw_face_locations(image, face_locations, report_values, lib='pil', show_images=True, save_images=True,
+def draw_face_locations(image, face_locations, report_values, lib='pil', show_images=True, save_images=False,
                         label_faces=False, show_axes=False, show_points=True):
     """
 
@@ -313,7 +313,8 @@ def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=
         face_locations = order_face_locations(face_locations)
         draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces=True)
 
-    print("Total processing time (seconds): ", round(total_processing_time, 2))
+    if report:
+        print("Total processing time (seconds): ", round(total_processing_time, 2))
 
     if return_flag:
         return face_locations
@@ -372,7 +373,8 @@ def find_face_locations_fr(images_folder, lib='pil', report=True, show_images=Tr
         report_values = (result_image_path, number_of_faces, processing_time)
         draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces=True)
 
-    print("Total processing time (seconds): ", round(total_processing_time, 2))
+    if report:
+        print("Total processing time (seconds): ", round(total_processing_time, 2))
 
     if return_flag:
         return face_locations
@@ -430,7 +432,79 @@ def find_face_landmarks_fr(images_folder, lib='pil', report=True, show_images=Tr
         report_values = (result_image_path, number_of_faces, processing_time)
         draw_face_landmarks(image, face_landmarks, report_values, lib, show_images, save_images, label_faces=True)
 
-    print("Total processing time (seconds): ", round(total_processing_time, 2))
+    if report:
+        print("Total processing time (seconds): ", round(total_processing_time, 2))
 
     if return_flag:
         return face_landmarks
+
+
+def find_face_embeddings(images_folder, report=True, show_images=False, save_embeddings=False):
+    """
+    :param report:
+    :param image: An image (as a numpy array)
+    :param face_detector:   - "hog" is less accurate but faster on CPUs.
+                            - "cnn" is a more accurate deep-learning model which is GPU/CUDA accelerated (if available).
+                            - The default is "hog".
+    :return: face_locations
+    """
+
+    total_processing_time = 0
+
+    if not os.path.isdir(images_folder):
+        image_file = os.path.basename(images_folder)
+        images_folder = os.path.dirname(images_folder)
+        listdir = [image_file]
+        return_flag = True
+    else:
+        listdir = os.listdir(images_folder)
+        return_flag = False
+
+    images_folder_result = images_folder + "_result"
+
+    if not os.path.exists(images_folder_result):
+        os.makedirs(images_folder_result)
+
+    if report:
+        print('-' * 80)
+        print("{:<20s}{:>20s}{:>20s}{:>20s}".format('image-file', 'num-of-faces', 'num-of-embeddings', 'process-time(sec)'))
+        print('-' * 80)
+
+    face_embeddings_dict = {'image':[], 'location':[], 'embedding':[]}
+
+    for image_file in listdir:
+
+        start_time = time.time()
+
+        image_path = os.path.join(images_folder, image_file)
+        result_image_path = os.path.join(images_folder_result, image_file)
+
+        image = face_recognition.load_image_file(image_path)
+        face_locations = find_face_locations_onnx(image_path, report=False, show_images=show_images,save_images=False)
+        face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations, model='large')
+
+        processing_time = round((time.time() - start_time), 2)
+        total_processing_time += processing_time
+
+        if report:
+            print("{:<20s}{:>20d}{:>20d}{:>20.2f}".format(image_file,
+                                                          len(face_locations),
+                                                          len(face_embeddings),
+                                                          processing_time))
+
+        if save_embeddings:
+            for i in range(len(face_embeddings)):
+                face_embeddings_dict['image'].append(image_path)
+                face_embeddings_dict['location'].append(face_locations[i])
+                face_embeddings_dict['embedding'].append(face_embeddings[i])
+
+        print(face_embeddings_dict)
+        # TODO: add two saving options (pickle and database)
+        #report_values = (result_image_path, number_of_faces, processing_time)
+        #draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces=True)
+
+    if report:
+        print("Total processing time (seconds): ", round(total_processing_time, 2))
+
+    if return_flag:
+        return face_embeddings
