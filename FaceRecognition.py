@@ -1,20 +1,16 @@
-from utilities import face_utilities, detect_imgs_onnx
-from face_recognition import load_image_file
-import os
-import time
+from utilities import face_utilities
+
+
 
 if __name__ == '__main__':
 
-    # Load the jpg file into a numpy array
-    #image_path = "imgs/1.jpg"
-    #face_utilities.find_face_locations(image_path, face_detector='ultra-light', report=True)
-    # face_utilities.find_face_landmarks(image_path, enumerate_faces=True, report=True)
+        # face_utilities.find_face_landmarks(image_path, enumerate_faces=True, report=True)
     # detect_imgs_onnx.find_face_locations(image_path, enumerate_faces=True, report=True)
 
     # Analyse folder
-    images_folder = 'imgs/1.jpg'
-    face_utilities.find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=True, save_images=True)
-    #face_utilities.find_face_locations_fr(images_folder, lib='pil', report=True, show_images=False, save_images=True)
+    images_folder = 'imgs'
+    face_locations = face_utilities.find_face_landmarks_fr(images_folder, lib='pil', report=True, show_images=True, save_images=False)
+    print(face_locations)
 
 '''
     label_path = "models/voc-model-labels.txt"
