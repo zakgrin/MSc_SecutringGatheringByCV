@@ -8,7 +8,7 @@ import PIL
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-
+import pickle
 import onnx
 import vision.utils.box_utils_numpy as box_utils
 from caffe2.python.onnx import backend
@@ -470,7 +470,7 @@ def find_face_embeddings(images_folder, report=True, show_images=False, save_emb
         print("{:<20s}{:>20s}{:>20s}{:>20s}".format('image-file', 'num-of-faces', 'num-of-embeddings', 'process-time(sec)'))
         print('-' * 80)
 
-    face_embeddings_dict = {'image':[], 'location':[], 'embedding':[]}
+    face_embeddings_dict = {'face':[], 'path':[], 'location':[], 'embedding':[]}
 
     for image_file in listdir:
 
@@ -494,11 +494,13 @@ def find_face_embeddings(images_folder, report=True, show_images=False, save_emb
 
         if save_embeddings:
             for i in range(len(face_embeddings)):
-                face_embeddings_dict['image'].append(image_path)
+                face_embeddings_dict['face'].append(image_file+'_face_'+str(i))
+                face_embeddings_dict['path'].append(image_path)
                 face_embeddings_dict['location'].append(face_locations[i])
                 face_embeddings_dict['embedding'].append(face_embeddings[i])
 
-        print(face_embeddings_dict)
+        #print([True if face=='2.jpg_face_0' else False for face in face_embeddings_dict['face']])
+        #print([key for key in face_embeddings_dict])
         # TODO: add two saving options (pickle and database)
         #report_values = (result_image_path, number_of_faces, processing_time)
         #draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces=True)
@@ -506,5 +508,7 @@ def find_face_embeddings(images_folder, report=True, show_images=False, save_emb
     if report:
         print("Total processing time (seconds): ", round(total_processing_time, 2))
 
-    if return_flag:
-        return face_embeddings
+    #if return_flag:
+    #    return face_embeddings
+    if save_embeddings:
+        return face_embeddings_dict
