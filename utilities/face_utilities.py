@@ -8,12 +8,12 @@ import PIL
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 import onnx
-import vision.utils.box_utils_numpy as box_utils
+import utilities.vision.utils.box_utils_numpy as box_utils
 from caffe2.python.onnx import backend
 # onnx runtime
 import onnxruntime as ort
+from utilities import face_database_utilities
 
 
 def draw_face_locations(image, face_locations, report_values, lib='pil', show_images=True, save_images=False,
@@ -81,7 +81,7 @@ def draw_face_locations(image, face_locations, report_values, lib='pil', show_im
             image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_BGR2RGB)
             cv2.imshow('image', image)
             cv2.waitKey(0)
-            # cv2.destroyAllWindows()
+            # cv2.destroyAllWindows() # slow!
         if show_axes:
             plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
             plt.show()
@@ -168,7 +168,7 @@ def draw_face_landmarks(image, face_landmarks, report_values, lib='pil', show_im
         for i in range(len(face_landmarks)):
             for name, list_of_points in face_landmarks[i].items():
                 # Print the location of each facial feature in this image
-                #print("The {} in this face has the following points: {}".format(name, list_of_points))
+                # print("The {} in this face has the following points: {}".format(name, list_of_points))
                 draw.line(list_of_points, fill="red", width=2)
 
             if label_faces:
@@ -256,11 +256,12 @@ def onnx_image_path_preprocessing(image_path, lib='cv2'):
     return processed_image, image
 
 
-def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=True, save_images=True):
-    label_path = "models/voc-model-labels.txt"
+def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=True, save_images=True,
+                             label_faces=True):
+    label_path = "utilities/models/voc-model-labels.txt"
     class_names = [name.strip() for name in open(label_path).readlines()]
 
-    onnx_path = "models/onnx/fixed_version-RFB-640.onnx"
+    onnx_path = "utilities/models/onnx/fixed_version-RFB-640.onnx"
     predictor = onnx.load(onnx_path)
     onnx.checker.check_model(predictor)
     onnx.helper.printable_graph(predictor.graph)
@@ -311,7 +312,7 @@ def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=
         labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(number_of_faces)]
         report_values = (result_image_path, number_of_faces, processing_time, labels_probs)
         face_locations = order_face_locations(face_locations)
-        draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces=True)
+        draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces)
 
     if report:
         print("Total processing time (seconds): ", round(total_processing_time, 2))
@@ -320,7 +321,7 @@ def find_face_locations_onnx(images_folder, lib='pil', report=True, show_images=
         return face_locations
 
 
-def find_face_locations_fr(images_folder, lib='pil', report=True, show_images=True, save_images=True):
+def find_face_locations_fr(images_folder, lib='pil', report=True, show_images=True, save_images=True, label_faces=True):
     """
     :param report:
     :param image: An image (as a numpy array)
@@ -371,7 +372,7 @@ def find_face_locations_fr(images_folder, lib='pil', report=True, show_images=Tr
             print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
 
         report_values = (result_image_path, number_of_faces, processing_time)
-        draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces=True)
+        draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces)
 
     if report:
         print("Total processing time (seconds): ", round(total_processing_time, 2))
@@ -439,7 +440,7 @@ def find_face_landmarks_fr(images_folder, lib='pil', report=True, show_images=Tr
         return face_landmarks
 
 
-def find_face_embeddings(images_folder, report=True, show_images=False, save_embeddings=False):
+def find_face_embeddings(images_folder, report=True, show_images=False, return_dict=False):
     """
     :param report:
     :param image: An image (as a numpy array)
@@ -455,10 +456,8 @@ def find_face_embeddings(images_folder, report=True, show_images=False, save_emb
         image_file = os.path.basename(images_folder)
         images_folder = os.path.dirname(images_folder)
         listdir = [image_file]
-        return_flag = True
     else:
         listdir = os.listdir(images_folder)
-        return_flag = False
 
     images_folder_result = images_folder + "_result"
 
@@ -467,10 +466,12 @@ def find_face_embeddings(images_folder, report=True, show_images=False, save_emb
 
     if report:
         print('-' * 80)
-        print("{:<20s}{:>20s}{:>20s}{:>20s}".format('image-file', 'num-of-faces', 'num-of-embeddings', 'process-time(sec)'))
+        print("{:<20s}{:>20s}{:>20s}{:>20s}".format('image-file', 'num-of-faces', 'num-of-embeddings',
+                                                    'process-time(sec)'))
         print('-' * 80)
 
-    face_embeddings_dict = {'face':[], 'path':[], 'location':[], 'embedding':[]}
+    if return_dict:
+        face_utilities_dict = {'face': [], 'path': [], 'location': [], 'embedding': []}
 
     for image_file in listdir:
 
@@ -480,8 +481,8 @@ def find_face_embeddings(images_folder, report=True, show_images=False, save_emb
         result_image_path = os.path.join(images_folder_result, image_file)
 
         image = face_recognition.load_image_file(image_path)
-        face_locations = find_face_locations_onnx(image_path, report=False, show_images=show_images,save_images=False)
-        face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations, model='large')
+        face_locations = find_face_locations_onnx(image_path, report=False, show_images=show_images, save_images=False)
+        face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations, model='small')
 
         processing_time = round((time.time() - start_time), 2)
         total_processing_time += processing_time
@@ -492,23 +493,33 @@ def find_face_embeddings(images_folder, report=True, show_images=False, save_emb
                                                           len(face_embeddings),
                                                           processing_time))
 
-        if save_embeddings:
+        if return_dict:
             for i in range(len(face_embeddings)):
-                face_embeddings_dict['face'].append(image_file+'_face_'+str(i))
-                face_embeddings_dict['path'].append(image_path)
-                face_embeddings_dict['location'].append(face_locations[i])
-                face_embeddings_dict['embedding'].append(face_embeddings[i])
-
-        #print([True if face=='2.jpg_face_0' else False for face in face_embeddings_dict['face']])
-        #print([key for key in face_embeddings_dict])
-        # TODO: add two saving options (pickle and database)
-        #report_values = (result_image_path, number_of_faces, processing_time)
-        #draw_face_locations(image, face_locations, report_values, lib, show_images, save_images, label_faces=True)
+                face_utilities_dict['face'].append(image_file + os.path.sep + 'face_' + str(i))
+                face_utilities_dict['path'].append(image_path)
+                face_utilities_dict['location'].append(face_locations[i])
+                face_utilities_dict['embedding'].append(face_embeddings[i])
 
     if report:
         print("Total processing time (seconds): ", round(total_processing_time, 2))
 
-    #if return_flag:
-    #    return face_embeddings
-    if save_embeddings:
-        return face_embeddings_dict
+    if return_dict:
+        return face_utilities_dict
+
+
+def save_faces(image_path, face_numbers=None, database='faces.db'):
+    face_utilities_dict = find_face_embeddings(image_path, report=False, return_dict=True)
+    # copy dictionary keys
+        #TODO: did not work! > selected_faces_dict = dict.fromkeys(face_utilities_dict.keys(), [])
+    selected_faces_dict = {}
+    for key in face_utilities_dict.keys():
+        selected_faces_dict[key] = []
+    # convert face_numbers to a list if it is not a list
+    if type(face_numbers) != type([]):
+        face_numbers = [face_numbers]
+    # copy selected faces only
+    for face_number in face_numbers:
+        for key in face_utilities_dict.keys():
+            selected_faces_dict[key].append(face_utilities_dict[key][face_number])
+    face_database_utilities.save(database, selected_faces_dict)
+    print('faces ({}) in image ({}) were saved sucessfully!'.format(face_numbers, image_path))
