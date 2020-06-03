@@ -4,10 +4,10 @@ from utilities import face_utilities, face_database_utilities
 def find_face_locations(images_folder):
     # face_utilities.find_face_landmarks(image_path, enumerate_faces=True, report=True)
     face_utilities.find_face_locations_onnx(images_folder,
-                                            lib='cv2',
+                                            lib='pil',
                                             report=True,
                                             show_images=True,
-                                            save_images=False,
+                                            save_images=True,
                                             label_faces=True)
 
 
@@ -50,10 +50,10 @@ if __name__ == '__main__':
     #find_face_locations('imgs')
     #find_face_locations('imgs/2.jpg')
     #check_database_inputs_and_inputs('imgs/2.jpg')
-    print_database_dict('faces.db')
+    #print_database_dict('faces.db')
     #find_face_embeddings('imgs/2.jpg')
-    save_faces('imgs/2.jpg', face_numbers=2)
+    #save_faces('imgs/2.jpg', face_numbers=2)
     #face_database_utilities.delete(database_path='faces.db',delete='image',image_path='imgs/2.jpg')
     #face_database_utilities.delete(database_path='faces.db', to_delete='face', image_path='imgs/24.jpg', face='24.jpg/face_0')
 
-    #print_database_dict('faces.db')
+    print_database_dict('faces.db')
