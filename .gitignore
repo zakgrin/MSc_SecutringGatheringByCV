@@ -4,5 +4,5 @@
 /pyvenv.cfg
 /venv
 /words.db
-/imgs_result/
+/output
 /faces.db
