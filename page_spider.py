@@ -1,6 +1,6 @@
 import os
 import argparse
-from utilities import url_utilities, database_utilities
+from utilities import url_utilities, database
 
 
 def main(database: str, url_list_file: str):
@@ -19,11 +19,11 @@ def main(database: str, url_list_file: str):
     os.chdir(os.path.dirname(__file__))
     path = os.path.join(os.getcwd(), "words.db")
     # 2: create the database
-    database_utilities.create_database(database_path=path)
+    database.create_database(database_path=path)
     # 3: save list of words into the database
-    database_utilities.save_words_to_data_base(database_path=path, words_list=big_word_list)
+    database.save_words_to_data_base(database_path=path, words_list=big_word_list)
     # 4: report top 10 words by count
-    top_list = database_utilities.print_database_table(database_path=path)
+    top_list = database.print_database_table(database_path=path)
     print('Top 10 words:')
     for item in top_list:
         print(item)
