@@ -3,6 +3,6 @@
 /.idea
 /pyvenv.cfg
 /venv
-/words.db
 /output
-/faces.db
+/database/words.db
+/database/faces.db

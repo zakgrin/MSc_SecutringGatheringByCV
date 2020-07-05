@@ -3,12 +3,13 @@ from utilities import face_detect, face_database
 
 def find_face_locations(images_folder):
     # face_utilities.find_face_landmarks(image_path, enumerate_faces=True, report=True)
-    face_detect.find_face_locations_onnx(images_folder,
-                                         lib='cv2',
-                                         report=True,
-                                         show_images=True,
-                                         save_images=False,
-                                         label_faces=True)
+    face_detect.detect_faces(images_folder,
+                             model='hog',
+                             lib='pil',
+                             report=True,
+                             show_images=True,
+                             save_images=False,
+                             label_faces=True)
 
 
 def print_database_dict(database_path):
@@ -19,10 +20,10 @@ def check_database_inputs_and_inputs(image_path):
     # output: from face_utilities
     face_utilities_dict = face_detect.find_face_embeddings(image_path, show_images=False, return_dict=True)
     # input: from face_utilities to face_database_utilities
-    face_database.create('faces.db')
-    face_database.save('faces.db', face_utilities_dict)
+    face_database.create('database/faces.db')
+    face_database.save('database/faces.db', face_utilities_dict)
     # output: from face_database_utilities
-    face_database_dict = face_database.retrieve('faces.db')
+    face_database_dict = face_database.retrieve('database/faces.db')
 
     # test 1: check types and length of both dictionaries
     for key in face_utilities_dict.keys():
@@ -46,8 +47,8 @@ def save_faces(image_path,face_numbers):
     face_detect.save_faces(image_path, face_numbers)
 
 if __name__ == '__main__':
-    find_face_locations('input/imgs')
-    #find_face_locations('input/imgs/2.jpg')
+    #find_face_locations('input/imgs')
+    find_face_locations('input/imgs/3.jpg')
     #check_database_inputs_and_inputs('input/imgs/2.jpg')
     #print_database_dict('faces.db')
     #find_face_embeddings('imgs/2.jpg')
