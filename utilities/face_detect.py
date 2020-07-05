@@ -2,9 +2,10 @@ import face_recognition
 import os
 import re
 import time
-import PIL
+# import PIL
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 import onnx
 from utilities import face_database
 from utilities import face_draw
@@ -51,13 +52,11 @@ def onnx_predict(width, height, confidences, boxes, prob_threshold, iou_threshol
 def onnx_image_preprocessing(image_file, size=(640, 480)): #(320, 240)
 
     if type(image_file) == str:
-        image = cv2.imread(image_file)
+        image = cv2.cvtColor(cv2.imread(image_file), cv2.COLOR_BGR2RGB)
     else:
         image = image_file
 
     # Add if there is a problem with the model onnx_predict
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
     processed_image = cv2.resize(image, (size[0], size[1]))
     image_mean = np.array([127, 127, 127])
     processed_image = (processed_image - image_mean) / 128
@@ -72,13 +71,12 @@ def onnx_image_preprocessing(image_file, size=(640, 480)): #(320, 240)
 
 
 def detect_faces(images_folder, model='onnx', lib='pil', report=True, show_images=True, save_images=True,
-                 label_faces=True):
+                 label_faces=True, show_axes=False):
 
     # model preparation
     if model == 'onnx':
         label_path = "utilities/models/voc-model-labels.txt"
         class_names = [name.strip() for name in open(label_path).readlines()]
-
         onnx_path = "utilities/models/onnx/fixed_version-RFB-640.onnx"
         predictor = onnx.load(onnx_path)
         # onnx.checker.check_model(predictor)
@@ -88,7 +86,7 @@ def detect_faces(images_folder, model='onnx', lib='pil', report=True, show_image
         input_name = ort_session.get_inputs()[0].name
         threshold = 0.7
 
-    total_processing_time = 0
+    total_process_time = 0
 
     if not os.path.isdir(images_folder):
         image_file = os.path.basename(images_folder)
@@ -123,34 +121,38 @@ def detect_faces(images_folder, model='onnx', lib='pil', report=True, show_image
             face_locations = onnx_order_face_locations(face_locations)
             labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(len(face_locations))]
         elif model == 'hog':
-            image = face_recognition.load_image_file(image_path)
+            image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
             face_locations = face_recognition.face_locations(image, model='hog')
             labels_probs = [f"face(?)" for i in range(len(face_locations))]
 
         number_of_faces = len(face_locations)
-        processing_time = round((time.time() - start_time), 2)
-        total_processing_time += processing_time
+        process_time = round((time.time() - start_time), 2)
+        total_process_time += process_time
 
         if report:
-            print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
+            print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, process_time))
 
-        report_values = (result_image_path, processing_time, labels_probs)
-        face_draw.draw_face_locations(image=image, face_locations=face_locations, report_values=report_values, lib=lib,
-                                      show_images=show_images, save_images=save_images, return_images=False,
-                                      label_faces=label_faces, show_axes=False, show_points=False)
+        report_dict = {'process_time':process_time,'labels_probs':labels_probs}
+        labeled_image = face_draw.face_locations(image=image,
+                                 face_locations=face_locations,
+                                 report_dict=report_dict,
+                                 channels='RGB',
+                                 lib=lib,
+                                 label_faces=label_faces,
+                                 show_points=False)
 
-        '''
-        save is part of draw_face_locations function
+        if show_images:
+            cv2.imshow('image', labeled_image)
+            cv2.waitKey(0)
+            # cv2.destroyAllWindows() # slow!
+        if show_axes:
+            plt.imshow(cv2.cvtColor(labeled_image, cv2.COLOR_BGR2RGB))
+            plt.show()
         if save_images:
-            if lib == 'pil':
-                if type(labeled_image) == np.ndarray:
-                    labeled_image = PIL.Image.fromarray(labeled_image)
-                labeled_image.save(result_image_path)
-            elif lib == 'cv2':
-                cv2.imwrite(result_image_path, labeled_image)
-        '''
+            cv2.imwrite(result_image_path, labeled_image)
+
     if report:
-        print("Total processing time (seconds): ", round(total_processing_time, 2))
+        print("Total processing time (seconds): ", round(total_process_time, 2))
 
     if return_flag:
         return face_locations
@@ -203,7 +205,7 @@ def landmark_faces(images_folder, lib='pil', report=True, show_images=True, save
             print("{:<20s}{:>20d}{:>20.2f}".format(image_file, number_of_faces, processing_time))
 
         report_values = (result_image_path, processing_time)
-        face_draw.draw_face_landmarks(image, face_landmarks, report_values, lib, show_images, save_images, label_faces=True)
+        face_draw.face_landmarks(image, face_landmarks, report_values, lib, show_images, save_images, label_faces=True)
 
     if report:
         print("Total processing time (seconds): ", round(total_processing_time, 2))
@@ -297,7 +299,7 @@ def save_faces(image_path, face_numbers=None, database='faces.db'):
     print('faces ({}) in image ({}) were saved sucessfully!'.format(face_numbers, image_path))
 
 
-def find_face_locations_webcam(video_path=0, model='onnx'):
+def find_face_locations_webcam(video_path=0, model='onnx', lib='pil'):
     if model == 'onnx':
         # takes 0.04 sec to load:
         onnx_path = "utilities/models/onnx/fixed_version-RFB-640.onnx"
@@ -336,14 +338,16 @@ def find_face_locations_webcam(video_path=0, model='onnx'):
 
         process_time.append(round(time.time() - start_time, 2))
 
-        report_values = ('', process_time[i], labels_probs)
+        report_dict = {'process_time':process_time[i],'labels_probs':labels_probs}
+        labeled_frame = face_draw.face_locations(image=frame,
+                                         face_locations=face_locations,
+                                         report_dict=report_dict,
+                                         channels='BGR',
+                                         lib=lib,
+                                         label_faces=True,
+                                         show_points=True)
 
-        labeled_frame = face_draw.draw_face_locations(image=frame, face_locations=face_locations, report_values=report_values,
-                                                      lib='pil',
-                                                      show_images=False, save_images=False, return_images=True,
-                                                      label_faces=True, show_axes=False, show_points=False)
-
-        cv2.imshow('Input', labeled_frame)
+        cv2.imshow('Webcam', labeled_frame)
         i += 1
 
         c = cv2.waitKey(1)

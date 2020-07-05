@@ -1,11 +1,11 @@
 from utilities import face_detect, face_database
 
 
-def find_face_locations(images_folder):
+def find_face_locations(images_folder, lib):
     # face_utilities.find_face_landmarks(image_path, enumerate_faces=True, report=True)
     face_detect.detect_faces(images_folder,
-                             model='hog',
-                             lib='pil',
+                             model='onnx',
+                             lib=lib,
                              report=True,
                              show_images=True,
                              save_images=False,
@@ -48,7 +48,9 @@ def save_faces(image_path,face_numbers):
 
 if __name__ == '__main__':
     #find_face_locations('input/imgs')
-    find_face_locations('input/imgs/3.jpg')
+    find_face_locations('input/imgs/3.jpg', lib='cv2')
+    #face_detect.find_face_locations_webcam(model='onnx',lib='cv2')
+
     #check_database_inputs_and_inputs('input/imgs/2.jpg')
     #print_database_dict('faces.db')
     #find_face_embeddings('imgs/2.jpg')
@@ -59,7 +61,7 @@ if __name__ == '__main__':
     #print_database_dict('faces.db')
     #face_utilities.train_face_recognition_classifier()
 
-    #face_utilities.find_face_locations_webcam(model='onnx')
+    #face_detect.find_face_locations_webcam(model='onnx',lib='pil')
     #face_utilities.find_face_locations_webcam(video_path='videos/lunch_scene.mp4',model='onnx')
 
     #face_utilities.train_face_recognition_classifier()
