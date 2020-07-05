@@ -49,14 +49,8 @@ def onnx_predict(width, height, confidences, boxes, prob_threshold, iou_threshol
     return picked_box_probs[:, :4].astype(np.int32), np.array(picked_labels), picked_box_probs[:, 4]
 
 
-def onnx_image_preprocessing(image_file, size=(640, 480)): #(320, 240)
+def onnx_image_preprocessing(image, size=(640, 480)): #(320, 240)
 
-    if type(image_file) == str:
-        image = cv2.cvtColor(cv2.imread(image_file), cv2.COLOR_BGR2RGB)
-    else:
-        image = image_file
-
-    # Add if there is a problem with the model onnx_predict
     processed_image = cv2.resize(image, (size[0], size[1]))
     image_mean = np.array([127, 127, 127])
     processed_image = (processed_image - image_mean) / 128
@@ -64,10 +58,7 @@ def onnx_image_preprocessing(image_file, size=(640, 480)): #(320, 240)
     processed_image = np.expand_dims(processed_image, axis=0)
     processed_image = processed_image.astype(np.float32)
 
-    if type(image_file) == str:
-        return processed_image, image
-    else:
-        return processed_image
+    return processed_image
 
 
 def detect_faces(images_folder, model='onnx', lib='pil', report=True, show_images=True, save_images=True,
@@ -112,16 +103,16 @@ def detect_faces(images_folder, model='onnx', lib='pil', report=True, show_image
 
         image_path = os.path.join(images_folder, image_file)
         result_image_path = os.path.join(images_folder_result, image_file)
+        image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
 
         # todo: order should adapt to onnx
         if model == 'onnx':
-            processed_image, image = onnx_image_preprocessing(image_path)
+            processed_image = onnx_image_preprocessing(image)
             confidences, boxes = ort_session.run(None, {input_name: processed_image})
             face_locations, labels, probs = onnx_predict(image.shape[1], image.shape[0], confidences, boxes, threshold)
             face_locations = onnx_order_face_locations(face_locations)
             labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(len(face_locations))]
         elif model == 'hog':
-            image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
             face_locations = face_recognition.face_locations(image, model='hog')
             labels_probs = [f"face(?)" for i in range(len(face_locations))]
 
@@ -142,15 +133,15 @@ def detect_faces(images_folder, model='onnx', lib='pil', report=True, show_image
                                  show_points=False)
 
         if show_images:
-            cv2.imshow('image', labeled_image)
+            cv2.imshow('output image', labeled_image)
             cv2.waitKey(0)
-            # cv2.destroyAllWindows() # slow!
         if show_axes:
             plt.imshow(cv2.cvtColor(labeled_image, cv2.COLOR_BGR2RGB))
             plt.show()
         if save_images:
             cv2.imwrite(result_image_path, labeled_image)
 
+    cv2.destroyAllWindows()
     if report:
         print("Total processing time (seconds): ", round(total_process_time, 2))
 

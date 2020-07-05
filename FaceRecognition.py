@@ -47,9 +47,9 @@ def save_faces(image_path,face_numbers):
     face_detect.save_faces(image_path, face_numbers)
 
 if __name__ == '__main__':
-    #find_face_locations('input/imgs')
-    find_face_locations('input/imgs/3.jpg', lib='cv2')
-    #face_detect.find_face_locations_webcam(model='onnx',lib='cv2')
+    find_face_locations('input/imgs', lib='cv2')
+    #find_face_locations('input/imgs/3.jpg', lib='pil')
+    #face_detect.find_face_locations_webcam(model='onnx',lib='pil')
 
     #check_database_inputs_and_inputs('input/imgs/2.jpg')
     #print_database_dict('faces.db')
