@@ -2,14 +2,14 @@ from utilities import face_detect, face_database
 
 
 def find_face_locations(images_folder, lib):
-    # face_utilities.find_face_landmarks(image_path, enumerate_faces=True, report=True)
-    face_detect.detect_faces(images_folder,
-                             model='onnx',
-                             lib=lib,
-                             report=True,
-                             show_images=True,
-                             save_images=False,
-                             label_faces=True)
+    face_detect.detect_faces_in_images(images_folder,
+                                       model='onnx',
+                                       lib=lib,
+                                       report=True,
+                                       show_images=True,
+                                       save_images=False,
+                                       label_faces=True,
+                                       show_landmarks=False)
 
 
 def print_database_dict(database_path):
@@ -47,9 +47,12 @@ def save_faces(image_path,face_numbers):
     face_detect.save_faces(image_path, face_numbers)
 
 if __name__ == '__main__':
-    find_face_locations('input/imgs', lib='cv2')
-    #find_face_locations('input/imgs/3.jpg', lib='pil')
-    #face_detect.find_face_locations_webcam(model='onnx',lib='pil')
+
+    #find_face_locations('input/imgs', lib='pil')
+    #find_face_locations('input/imgs/3.jpg', lib='cv2')
+
+    face_detect.detect_faces_in_videos(model='onnx', lib='cv2', classify_faces=False, show_landmarks=False)
+    #face_detect.detect_faces_in_videos(video_path='input/videos/lunch_scene.mp4',model='onnx', lib='pil', classify_faces=False, show_landmarks=False)
 
     #check_database_inputs_and_inputs('input/imgs/2.jpg')
     #print_database_dict('faces.db')
@@ -61,7 +64,7 @@ if __name__ == '__main__':
     #print_database_dict('faces.db')
     #face_utilities.train_face_recognition_classifier()
 
-    #face_detect.find_face_locations_webcam(model='onnx',lib='pil')
-    #face_utilities.find_face_locations_webcam(video_path='videos/lunch_scene.mp4',model='onnx')
+    #face_detect.detect_faces_in_videos(model='onnx',lib='pil')
+    #face_utilities.detect_faces_in_videos(video_path='videos/lunch_scene.mp4',model='onnx')
 
     #face_utilities.train_face_recognition_classifier()
