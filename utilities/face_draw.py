@@ -24,7 +24,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         # draw text on top of the image
         font_list = ["arial.ttf", "handwriting-markervalerieshand-regular.ttf", "Drawing_Guides.ttf"]
         font = PIL.ImageFont.truetype("input/fonts/" + font_list[0], 22)
-        # for loop in face locations
+        # loop in face locations
         for i in range(len(face_locations)):
             # draw face locations
             top, right, bottom, left = face_locations[i]
@@ -58,7 +58,6 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
             for i in range(len(face_landmarks)):
                 for name, list_of_points in face_landmarks[i].items():
                     draw.line(list_of_points, fill="red", width=2)
-
         # summary on top of the image
         text = "Number of Faces = {} ({} seconds)".format(number_of_faces, process_time)
         width, height = font.getsize(text) # or draw.textsize(text, font=font)
@@ -67,48 +66,50 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
                   text,
                   fill='blue',
                   font=font)
-
         # return to BGR
         image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
     elif lib == 'cv2':
-
         # if RGB: convert to BGR
         if channels.lower() == 'RGB'.lower():
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
+        # loop in face locations
         for i in range(len(face_locations)):
             top, right, bottom, left = face_locations[i]
             cv2.rectangle(image, (left, top), (right, bottom), color=(0, 0, 255), thickness=4)
-            # cv2.rectangle(image, (top, left), (bottom, right), color=(0, 0, 255), thickness=5) # without ordering
+            # without ordering: (top, left), (bottom, right)
+            # show vertex points for debugging
             if show_points:
                 cv2.circle(image, (left, top), radius=5, thickness=-1, color=(0, 255, 255))  # top left yellow
                 cv2.circle(image, (left, bottom), radius=5, thickness=-1, color=(0, 165, 255))  # bottom left orange
                 cv2.circle(image, (right, top), radius=5, thickness=-1, color=(0, 255, 0))  # top right green
                 cv2.circle(image, (right, bottom), radius=5, thickness=-1, color=(0, 0, 0))  # bottom right black
+            # show labels below face locations
             if label_faces:
+                # draw label box below face location
                 bottom_ = bottom + int(0.15 * (bottom - top))
                 cv2.rectangle(image, (left, bottom), (right, bottom_), (0, 0, 255), cv2.FILLED)
+                # find text size based on the label box size
                 text = "{}.{}".format(i + 1, labels_probs[i])
-
                 face_font_size = 0.0
                 width, height = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, face_font_size, 2)[0]
                 while width < right-left and height < bottom_-bottom:
                     face_font_size += 0.1
                     width, height = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, face_font_size, 2)[0]
                 face_font_size -= 0.1
+                # put text on label box
                 cv2.putText(image, text,
                             (left, int(bottom+(0.7*(bottom_-bottom)))),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             face_font_size,
                             (255, 0, 0),
                             2)
-
+        # show faces landmarks
         if face_landmarks and face_landmarks:
             for i in range(len(face_landmarks)):
                 for name, list_of_points in face_landmarks[i].items():
                     cv2.drawContours(image, [np.array(list_of_points)], 0, (0,0,255),1)
-
+        # summary on top of the image
         text = "Number of Faces = {} ({} seconds)".format(number_of_faces, process_time)
         width, height = cv2.getTextSize(text,cv2.FONT_HERSHEY_SIMPLEX,0.6,2)[0]
         cv2.rectangle(image, (20, 5), (width+20, height+10), (255,255,255), cv2.FILLED)
@@ -122,59 +123,4 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
 
     # return as BGR
     return image
-
-
-def face_landmarks(image, face_landmarks, report_values, lib='pil', show_images=True, save_images=True,
-                   label_faces=False, show_axes=False, show_points=True):
-    """
-
-    :param label_faces: Show number of the face according to detection order
-    """
-    # report values
-    number_of_faces = len(face_landmarks)
-    if len(report_values) == 3:
-        (image_path, processing_time, labels_probs) = report_values
-    elif len(report_values) == 2:
-        (image_path, processing_time) = report_values
-        labels_probs = [f"face(?)" for i in range(number_of_faces)]
-
-    if lib == 'pil' and (show_images or save_images):
-        # Load the image into a Python Image Library object so that we can draw on top of it and display it
-        pil_image = PIL.Image.fromarray(image)
-        # Create draw object
-        draw = PIL.ImageDraw.Draw(pil_image)
-        # Draw text on top of the image
-        font_list = ["arial.ttf", "handwriting-markervalerieshand-regular.ttf", "Drawing_Guides.ttf"]
-        font = PIL.ImageFont.truetype("input/fonts/" + font_list[0], 22)
-
-        if label_faces:
-            text = "Number of Faces = {} ({} seconds)".format(number_of_faces, processing_time)
-            draw.text((10, 10),
-                      text,
-                      fill='blue',
-                      font=font)
-
-        for i in range(len(face_landmarks)):
-            for name, list_of_points in face_landmarks[i].items():
-                # Print the location of each facial feature in this image
-                # print("The {} in this face has the following points: {}".format(name, list_of_points))
-                draw.line(list_of_points, fill="red", width=2)
-
-            if label_faces:
-                left = min([x for x, y in list_of_points])
-                bottom = max([y for x, y in list_of_points]) + (
-                        max([y for x, y in list_of_points]) -
-                        min([y for x, y in list_of_points]))
-                # TODO: here the text rectangle boox has to be equal to all faces but as ration to adjust to face size
-                draw.rectangle([left, bottom, left + 50, bottom + 50], fill="red", outline="red", width=5)
-                print(i, len(labels_probs))
-                text = "{}.{}".format(i + 1, labels_probs[i])
-                draw.text((left, bottom),
-                          text,
-                          fill='blue',
-                          font=font)
-
-        # return to BGR
-        image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-
 

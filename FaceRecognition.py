@@ -51,7 +51,7 @@ if __name__ == '__main__':
     #find_face_locations('input/imgs', lib='pil')
     #find_face_locations('input/imgs/3.jpg', lib='cv2')
 
-    face_detect.detect_faces_in_videos(model='onnx', lib='cv2', classify_faces=False, show_landmarks=False)
+    #face_detect.detect_faces_in_videos(model='onnx', lib='pil', classify_faces=False, show_landmarks=False)
     #face_detect.detect_faces_in_videos(video_path='input/videos/lunch_scene.mp4',model='onnx', lib='pil', classify_faces=False, show_landmarks=False)
 
     #check_database_inputs_and_inputs('input/imgs/2.jpg')
@@ -62,9 +62,9 @@ if __name__ == '__main__':
     #face_database_utilities.delete(database_path='faces.db', to_delete='face', image_path='imgs/24.jpg', face='24.jpg/face_0')
 
     #print_database_dict('faces.db')
-    #face_utilities.train_face_recognition_classifier()
+    #face_utilities.train_face_classifier()
 
     #face_detect.detect_faces_in_videos(model='onnx',lib='pil')
     #face_utilities.detect_faces_in_videos(video_path='videos/lunch_scene.mp4',model='onnx')
 
-    #face_utilities.train_face_recognition_classifier()
+    #face_utilities.train_face_classifier()
