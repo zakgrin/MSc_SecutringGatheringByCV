@@ -51,7 +51,7 @@ def save(database_path: str, face_utilities_dict: dict):
             cur.execute(sql)
             i += 1
     conn.close()
-    print("Database operation is complete!")
+    print("Database saving operation is complete!")
 
 
 def retrieve(database_path: str):

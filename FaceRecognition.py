@@ -7,7 +7,7 @@ def find_face_locations(images_folder, lib):
                                        lib=lib,
                                        report=True,
                                        show_images=True,
-                                       save_images=False,
+                                       save_images=True,
                                        label_faces=True,
                                        show_landmarks=False)
 
@@ -44,24 +44,28 @@ def find_face_embeddings(images_folder):
     #print(face_utilities_dict)
 
 def save_faces(image_path,face_numbers):
-    face_detect.save_faces(image_path, face_numbers)
+    face_detect.save_faces_dict(image_path, face_numbers)
 
 if __name__ == '__main__':
 
+    #find_face_locations('input/imgs/3.jpg', lib='pil')
     #find_face_locations('input/imgs', lib='pil')
-    #find_face_locations('input/imgs/3.jpg', lib='cv2')
 
     #face_detect.detect_faces_in_videos(model='onnx', lib='pil', classify_faces=False, show_landmarks=False)
     #face_detect.detect_faces_in_videos(video_path='input/videos/lunch_scene.mp4',model='onnx', lib='pil', classify_faces=False, show_landmarks=False)
 
+    face_detect.save_faces_dict(image_path='input/imgs/1.jpg', label_option='predefined')
+    #print_database_dict('database/faces.db')
+
     #check_database_inputs_and_inputs('input/imgs/2.jpg')
+
     #print_database_dict('faces.db')
     #find_face_embeddings('imgs/2.jpg')
-    #save_faces('imgs/2.jpg', face_numbers=2)
+    #save_faces_dict('imgs/2.jpg', face_numbers=2)
     #face_database_utilities.delete(database_path='faces.db',delete='image',image_path='imgs/2.jpg')
     #face_database_utilities.delete(database_path='faces.db', to_delete='face', image_path='imgs/24.jpg', face='24.jpg/face_0')
 
-    #print_database_dict('faces.db')
+
     #face_utilities.train_face_classifier()
 
     #face_detect.detect_faces_in_videos(model='onnx',lib='pil')
