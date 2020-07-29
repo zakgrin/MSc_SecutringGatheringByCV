@@ -13,6 +13,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
     process_time = report_dict['process_time']
     labels_probs = report_dict['labels_probs']
     channels = report_dict['channels']
+    face_labels = report_dict['face_labels']
 
     if lib == 'pil':
         # if BGR: convert to RGB
@@ -26,9 +27,14 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         font = PIL.ImageFont.truetype("input/fonts/" + font_list[0], 22)
         # loop in face locations
         for i in range(len(face_locations)):
+            # check if person registered
+            c = "red"
+            if face_labels:
+                if face_labels[i]: c = "green"
             # draw face locations
             top, right, bottom, left = face_locations[i]
-            draw.rectangle([left, top, right, bottom], fill=None, outline="red", width=5)
+
+            draw.rectangle([left, top, right, bottom], fill=None, outline=c, width=5)
             # show vertex points for debugging
             if show_points:
                 draw.ellipse((left - 5, top - 5, left + 5, top + 5), fill="yellow") # top left
@@ -39,7 +45,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
             if label_faces:
                 # draw label box below face location
                 bottom_ = bottom + int(0.2 * (bottom - top))
-                draw.rectangle([left, bottom, right, bottom_],fill="red", outline="red", width=5)
+                draw.rectangle([left, bottom, right, bottom_],fill=c, outline=c, width=5)
                 # find text size based on the label box size
                 text = "{}.{}".format(i + 1, labels_probs[i])
                 face_font_size = 0
@@ -57,7 +63,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         if show_landmarks and face_landmarks:
             for i in range(len(face_landmarks)):
                 for name, list_of_points in face_landmarks[i].items():
-                    draw.line(list_of_points, fill="red", width=2)
+                    draw.line(list_of_points, fill=c, width=2)
         # summary on top of the image
         text = "Number of Faces = {} ({} seconds)".format(number_of_faces, process_time)
         width, height = font.getsize(text) # or draw.textsize(text, font=font)

@@ -60,7 +60,8 @@ def onnx_image_preprocessing(image, size=(640, 480)): #(320, 240)
 
 
 def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, show_images=True, save_images=True,
-                           label_faces=True, show_axes=False, show_landmarks=False, return_option='locations'):
+                           label_faces=True, show_axes=False, show_landmarks=False, save_face_dict=False,
+                           return_option='locations', classify_faces=False):
     # load the model if requested (0.04 sec to load)
     if model == 'onnx':
         label_path = "utilities/models/voc-model-labels.txt"
@@ -77,35 +78,52 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
             print('Model onnx was loaded with threshold of {}'.format(threshold))
     # to calc processing time
     process_time = []
+    file_flag = True
+    channels = 'RGB'
+    # check if it is an image array
+    if isinstance(images_folder, np.ndarray):
+        listdir = [images_folder]
+        file_flag = False
+        return_flag = True
+        print('an image array was provided')
     # check if it is not a folder
-    if not os.path.isdir(images_folder):
+    elif not os.path.isdir(images_folder):
         image_file = os.path.basename(images_folder)
         images_folder = os.path.dirname(images_folder)
         listdir = [image_file]
         return_flag = True
-    # if it is a folder then give a list of files inside but no return
+        print('an image path was provided')
+    # if it is an image array or file, then give a list of files inside the folder but no return
     else:
         listdir = os.listdir(images_folder)
         return_flag = False
         return_option = None
-    # creating output folder if it does not exist
-    images_folder_result = "output" + re.split('input',images_folder)[1] + "_result"
-    if not os.path.exists(images_folder_result):
-        os.makedirs(images_folder_result)
+        print('a folder of images was provided')
+    if file_flag:
+        # creating output folder if it does not exist
+        images_folder_result = "output" + re.split('input',images_folder)[1] + "_result"
+        if not os.path.exists(images_folder_result):
+            os.makedirs(images_folder_result)
     # values to report at for each file
     if report:
         print('-' * 60)
         print("{:<20s}{:>20s}{:>20s}".format('image-file', 'num-of-faces', 'process-time[sec]'))
         print('-' * 60)
     # creating embeddings dict if requested
-    if return_option == 'dict':
+    if return_option == 'dict' or save_face_dict:
         faces_dict = {'face': [], 'path': [], 'location': [], 'embedding': []}
     # loop through all files
     for image_file in listdir:
-        # save image paths to read/save the image file
-        image_path = os.path.join(images_folder, image_file)
-        result_image_path = os.path.join(images_folder_result, image_file)
-        image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        if file_flag:
+            # save image paths to read/save the image file
+            image_path = os.path.join(images_folder, image_file)
+            result_image_path = os.path.join(images_folder_result, image_file)
+            image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        else:
+            image = image_file
+            image_file = 'image'
+            image_path = 'webcam'
+            channels = 'BGR'
         # start processing time
         start_time = time.time()
         # calc face locations based on the selected model
@@ -124,14 +142,23 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
         else:
             face_landmarks = None
         # calc face embeddings if requested
-        if return_option == 'embeddings' or return_option == 'dict':
+        if return_option == 'embeddings' or return_option == 'dict' or classify_faces:
             face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations, model='small')
-            # save face embeddings in a dict
+        # save face embeddings in a dict
+        if return_option == 'dict' or save_face_dict:
             for i in range(len(face_embeddings)):
                 faces_dict['face'].append(image_file + os.path.sep + 'face_' + str(i))
                 faces_dict['path'].append(image_path)
                 faces_dict['location'].append(face_locations[i])
                 faces_dict['embedding'].append(face_embeddings[i])
+        # save face dict in database:
+        if save_face_dict and not file_flag:
+            save_faces_dict(image_path, label_option='select')
+        # classify faces
+        if classify_faces:
+            face_labels = compare_faces(face_embeddings)
+        else:
+            face_labels = None
         # add face calc processing time (locations, embeddings, landmarks)
         process_time.append(round(time.time() - start_time, 2))
         # print step report
@@ -140,7 +167,8 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
         # draw image with face locations if requested
         if show_images or save_images or show_axes:
             # create report dict for draw function
-            report_dict = {'process_time':process_time[-1],'labels_probs':labels_probs, 'channels':'RGB'}
+            report_dict = {'process_time': process_time[-1], 'labels_probs': labels_probs, 'channels': channels,
+                           'face_labels': face_labels}
             # draw labeled image
             labeled_image = face_draw.face_locations(image=image,
                                                      report_dict=report_dict,
@@ -182,7 +210,8 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
             return faces_dict
 
 
-def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces=False, show_landmarks=False):
+def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces=False, show_landmarks=False,
+                           save_face_dict=True):
     # load the model if requested (0.04 sec to load)
     if model == 'onnx':
         onnx_path = "utilities/models/onnx/fixed_version-RFB-640.onnx"
@@ -197,6 +226,7 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
         raise IOError("Cannot open Webcam")
     # set report and loop parameters
     process_time = []
+    i = 0
     # loop infinitely until the exit condition
     while True:
         # read a frame from the Webcam
@@ -222,10 +252,19 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
         # calc face embeddings if requested (to recognize faces)
         if classify_faces:
             face_embeddings = face_recognition.face_encodings(frame, known_face_locations=face_locations, model='small')
-            face_labels = classify_faces(face_embeddings)
+            face_labels = compare_faces(face_embeddings)
+        else:
+            face_labels = None
+        if save_face_dict and i < 4:
+            if len(face_locations) > 0:
+                result = save_faces_dict(frame, label_option='select')
+                if result:
+                    i += 1
+
         # add face calc processing time (locations, embeddings, landmarks)
         process_time.append(round(time.time() - start_time, 2))
-        report_dict = {'process_time':process_time[-1],'labels_probs':labels_probs, 'channels':'BGR'}
+        report_dict = {'process_time':process_time[-1],'labels_probs':labels_probs, 'channels':'BGR',
+                       'face_labels':face_labels}
         labeled_frame = face_draw.face_locations(image=frame,
                                                  report_dict=report_dict,
                                                  face_locations=face_locations,
@@ -252,9 +291,9 @@ def save_faces_dict(image_path, face_numbers=None, label_option='select', databa
     # label option: predefined
     if label_option == 'predefined' or label_option == 'all':
         # calc face dict for the image
-        faces_dict = detect_faces_in_images(image_path, model='onnx', lib='pil', report=True, show_images=False,
-                                            save_images=False, label_faces=False, show_axes=False,
-                                            show_landmarks=False, return_option='dict')
+        faces_dict = detect_faces_in_images(image_path, model='onnx', lib='pil', report=False, show_images=False,
+                                            save_images=False, label_faces=False, show_axes=False, save_face_dict=False,
+                                            show_landmarks=False, return_option='dict', classify_faces=False)
         if face_numbers is None and label_option != 'all':
             print('face_numbers argument was not defined, all faces will be saved!')
         elif face_numbers:
@@ -263,30 +302,40 @@ def save_faces_dict(image_path, face_numbers=None, label_option='select', databa
                 face_numbers = [face_numbers]
             # edit index to match the dict
             face_numbers = [i-1 for i in face_numbers]
+        # save inputs flag
+        if len(faces_dict['location']) > 0:
+            inputs = 'y'
+        else:
+            inputs = 'n'
     # label option: selective
     elif label_option == 'select' or label_option == 'unselect':
         # calc face dict for the image
-        faces_dict = detect_faces_in_images(image_path, model='onnx', lib='pil', report=True, show_images=False,
-                                            save_images=False, label_faces=True, show_axes=True,
-                                            show_landmarks=False, return_option='dict')
+        faces_dict = detect_faces_in_images(image_path, model='onnx', lib='pil', report=False, show_images=True,
+                                            save_images=False, label_faces=True, show_axes=False, save_face_dict=False,
+                                            show_landmarks=False, return_option='dict', classify_faces=False)
         num_faces = len(faces_dict['location'])
         if label_option == 'select':
-            input = input('please select faces - list of face numbers: ')
-            face_numbers = [int(i)-1 for i in re.split(r'\W+', input) if i is not '']
+            inputs = input('please select faces - list of face numbers (enter [n] to cancel): ')
+            if inputs != 'n':
+                face_numbers = [int(i)-1 for i in re.split(r'\W+', inputs) if i is not '']
             #labels = [0] * len(num_faces)
             #for face_number in face_numbers:
             #    labels[face_number] = 1
         elif label_option == 'unselect':
-            input = input('please unselect faces - list of face numbers: ')
-            unselected_face_numbers = [int(i)-1 for i in re.split(r'\W+', input) if i is not '']
-            face_numbers = [i for i in range(num_faces) if i not in unselected_face_numbers]
+            inputs = input('please unselect faces - list of face numbers: ')
+            if inputs != 'n':
+                unselected_face_numbers = [int(i)-1 for i in re.split(r'\W+', inputs) if i is not '']
+                face_numbers = [i for i in range(num_faces) if i not in unselected_face_numbers]
             #labels = [1] * len(num_faces)
             #for face_number in face_numbers:
             #    labels[face_number] = 0
     else:
         print('Error: label_option argument is not recognized!')
+    # if image array then give a name
+    if isinstance(image_path, np.ndarray):
+        image_path = 'webcam'
     # save selected faces
-    if face_numbers:
+    if face_numbers and inputs != 'n':
         # create empty dict for the selected faces
         selected_faces_dict = {}
         for key in faces_dict.keys():
@@ -298,10 +347,16 @@ def save_faces_dict(image_path, face_numbers=None, label_option='select', databa
         # save selected faces dict in database
         face_database.save(database, selected_faces_dict)
         print('faces ({}) in image ({}) were saved successfully!'.format([i+1 for i in face_numbers], image_path))
+        return True
+    # cancel saving process
+    elif inputs == 'n':
+        print('no faces were saved from image ({})'.format(image_path))
+        return False
     # if no face numbers then save all faces dict in database
     else:
         face_database.save(database, faces_dict)
         print('all faces in image ({}) were saved successfully!'.format(image_path))
+        return True
 
 
 def train_face_classifier(database_path='faces.db'):
@@ -314,15 +369,24 @@ def train_face_classifier(database_path='faces.db'):
     print('face recognition classifier was trained successfully!')
 
 
-def classify_faces(face_embeddings, method='direct'):  # or recognize face
-
+def compare_faces(face_embeddings, method='compare', similarity=0.6):  # or recognize face
+    face_dict_database = face_database.retrieve('database/faces.db')
+    face_embeddings_database = face_dict_database['embedding']
     face_labels = []
 
     if method == 'direct':
         for face_embedding in face_embeddings:
             pass
-    elif method == 'classifier':
-        pass
+    elif method == 'compare':
+        for face_embedding in face_embeddings:
+            matches = face_recognition.compare_faces(face_embeddings_database, face_embedding, tolerance=1-similarity)
+            #name = "unknown"
+            if True in matches:
+                face_labels.append(1)
+                #first_match_index = matches.index(True)
+                #name = face_dict_database[first_match_index]
+            else:
+                face_labels.append(0)
 
     return face_labels
 
