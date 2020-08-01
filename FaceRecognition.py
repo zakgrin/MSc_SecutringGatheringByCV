@@ -9,6 +9,7 @@ def find_face_locations(images_folder, lib, save_dict):
                                        show_images=True,
                                        save_images=True,
                                        label_faces=True,
+                                       classify_faces=True,
                                        show_landmarks=False,
                                        save_face_dict=save_dict)
 
@@ -51,8 +52,8 @@ if __name__ == '__main__':
     #face_database.delete(database_path='database/faces.db', to_delete='all')
     print_database_dict('database/faces.db')
     #find_face_locations('input/imgs/1.jpg', lib='pil')
-    #find_face_locations('input/imgs', lib='pil',save_dict=False)
-    face_detect.detect_faces_in_videos(model='onnx', lib='pil', classify_faces=True, save_face_dict=False)
+    find_face_locations('input/imgs', lib='pil', save_dict=False)
+    #face_detect.detect_faces_in_videos(model='onnx', lib='pil', classify_faces=True, save_face_dict=True)
     #face_detect.detect_faces_in_videos(video_path='input/videos/lunch_scene.mp4',model='onnx', lib='pil', classify_faces=False, show_landmarks=False)
     print_database_dict('database/faces.db')
     #face_detect.save_faces_dict(image_path='input/imgs/1.jpg', label_option='predefined')

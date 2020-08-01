@@ -5,10 +5,14 @@ import time
 # import PIL
 import cv2
 import numpy as np
+from tensorflow import keras
+
 import matplotlib.pyplot as plt
 import onnx
 from utilities import face_database
 from utilities import face_draw
+from utilities import face_models
+
 import utilities.vision.utils.box_utils_numpy as box_utils
 # from caffe2.python.onnx import backend
 # onnx runtime
@@ -142,7 +146,7 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
         else:
             face_landmarks = None
         # calc face embeddings if requested
-        if return_option == 'embeddings' or return_option == 'dict' or classify_faces:
+        if return_option == 'embeddings' or return_option == 'dict' or classify_faces or save_face_dict:
             face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations, model='small')
         # save face embeddings in a dict
         if return_option == 'dict' or save_face_dict:
@@ -152,7 +156,7 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
                 faces_dict['location'].append(face_locations[i])
                 faces_dict['embedding'].append(face_embeddings[i])
         # save face dict in database:
-        if save_face_dict and not file_flag:
+        if save_face_dict:# and not file_flag:
             save_faces_dict(image_path, label_option='select')
         # classify faces
         if classify_faces:
@@ -369,10 +373,15 @@ def train_face_classifier(database_path='faces.db'):
     print('face recognition classifier was trained successfully!')
 
 
-def compare_faces(face_embeddings, method='compare', similarity=0.6):  # or recognize face
+def compare_faces(face_embeddings, method='siamese', similarity=0.6):  # or recognize face
     face_dict_database = face_database.retrieve('database/faces.db')
     face_embeddings_database = face_dict_database['embedding']
     face_labels = []
+
+    def step_func(dist):
+        if dist >= similarity:
+            return True
+        return False
 
     if method == 'direct':
         for face_embedding in face_embeddings:
@@ -387,7 +396,32 @@ def compare_faces(face_embeddings, method='compare', similarity=0.6):  # or reco
                 #name = face_dict_database[first_match_index]
             else:
                 face_labels.append(0)
-
+    elif method == 'siamese':
+        embeds_shape = face_embeddings_database[0].shape
+        print(embeds_shape)
+        embeds_model = face_models.init_siamse_model((embeds_shape), api='embeds')
+        optimizer = keras.optimizers.Adam(lr=0.00006)
+        embeds_model.compile(loss="binary_crossentropy",optimizer=optimizer, metrics='accuracy')
+        weights_path = "output/model/weights/epoch_embeds_bs256_ep280_final.h5"
+        embeds_model.load_weights(weights_path)
+        #model_path = "output/model/epoch_embeds_bs256_ep280_final.h5"
+        #embeds_model = keras.models.load_model(model_path)
+        for face_embedding in face_embeddings:
+            length = len(face_embeddings_database)
+            h = face_embeddings[0].shape[0]
+            shape = (length,h,1)
+            pairs = [np.zeros(shape, dtype=float) for i in range(2)]
+            pairs[0] = np.tile(np.array(face_embedding), (length,1)).reshape(shape)
+            pairs[1] = np.array(face_embeddings_database).reshape(shape)
+            probs = embeds_model.predict(pairs)
+            matches = [step_func(match) for match in probs]
+            # name = "unknown"
+            if True in matches:
+                face_labels.append(1)
+                # first_match_index = matches.index(True)
+                # name = face_dict_database[first_match_index]
+            else:
+                face_labels.append(0)
     return face_labels
 
 
