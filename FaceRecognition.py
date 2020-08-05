@@ -14,48 +14,20 @@ def find_face_locations(images_folder, lib, save_dict):
                                        save_face_dict=save_dict)
 
 
-def print_database_dict(database_path):
-    face_database_dict = face_database.retrieve(database_path)
-    print(face_database_dict['face'])
-
-def check_database_inputs_and_inputs(image_path):
-    # output: from face_utilities
-    face_utilities_dict = face_detect.find_face_embeddings(image_path, show_images=False, return_dict=True)
-    # input: from face_utilities to face_database_utilities
-    face_database.create('database/faces.db')
-    face_database.save('database/faces.db', face_utilities_dict)
-    # output: from face_database_utilities
-    face_database_dict = face_database.retrieve('database/faces.db')
-
-    # test 1: check types and length of both dictionaries
-    for key in face_utilities_dict.keys():
-        assert len(face_utilities_dict[key]) == len(face_database_dict[key])
-        assert type(face_utilities_dict[key]) == type(face_database_dict[key])
-        assert type(face_utilities_dict[key][0]) == type(face_database_dict[key][0])
-        print('Key="{}" was successfully stored and retrieved'.format(key))
-
-    # test 2: check length of two dictionaries
-    assert len(face_utilities_dict) + 1 == len(face_database_dict)
-    print('test is successful!')
-
-
 def find_face_embeddings(images_folder):
     face_utilities_dict = face_detect.find_face_embeddings(images_folder, report=True, show_images=True, return_dict=True)
     #face_database_utilities.create('faces.db')
     #face_database_utilities.save('faces.db', face_utilities_dict)
     #print(face_utilities_dict)
 
-def save_faces(image_path,face_numbers):
-    face_detect.save_faces_dict(image_path, face_numbers)
-
 if __name__ == '__main__':
     #face_database.delete(database_path='database/faces.db', to_delete='all')
-    print_database_dict('database/faces.db')
+    #print_database_dict('database/faces.db')
     #find_face_locations('input/imgs/1.jpg', lib='pil')
-    find_face_locations('input/imgs', lib='pil', save_dict=False)
-    #face_detect.detect_faces_in_videos(model='onnx', lib='pil', classify_faces=True, save_face_dict=True)
+    #find_face_locations('input/imgs', lib='pil', save_dict=True)
+    face_detect.detect_faces_in_videos(model='onnx', lib='pil', classify_faces=False, save_face_dict=False)
     #face_detect.detect_faces_in_videos(video_path='input/videos/lunch_scene.mp4',model='onnx', lib='pil', classify_faces=False, show_landmarks=False)
-    print_database_dict('database/faces.db')
+    #print_database_dict('database/faces.db')
     #face_detect.save_faces_dict(image_path='input/imgs/1.jpg', label_option='predefined')
     #print_database_dict('database/faces.db')
 

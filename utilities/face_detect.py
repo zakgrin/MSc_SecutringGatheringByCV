@@ -259,7 +259,7 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
             face_labels = compare_faces(face_embeddings)
         else:
             face_labels = None
-        if save_face_dict and i < 4:
+        if save_face_dict and i < 2:
             if len(face_locations) > 0:
                 result = save_faces_dict(frame, label_option='select')
                 if result:
@@ -383,45 +383,48 @@ def compare_faces(face_embeddings, method='siamese', similarity=0.6):  # or reco
             return True
         return False
 
-    if method == 'direct':
-        for face_embedding in face_embeddings:
-            pass
-    elif method == 'compare':
-        for face_embedding in face_embeddings:
-            matches = face_recognition.compare_faces(face_embeddings_database, face_embedding, tolerance=1-similarity)
-            #name = "unknown"
-            if True in matches:
-                face_labels.append(1)
-                #first_match_index = matches.index(True)
-                #name = face_dict_database[first_match_index]
-            else:
-                face_labels.append(0)
-    elif method == 'siamese':
-        embeds_shape = face_embeddings_database[0].shape
-        print(embeds_shape)
-        embeds_model = face_models.init_siamse_model((embeds_shape), api='embeds')
-        optimizer = keras.optimizers.Adam(lr=0.00006)
-        embeds_model.compile(loss="binary_crossentropy",optimizer=optimizer, metrics='accuracy')
-        weights_path = "output/model/weights/epoch_embeds_bs256_ep280_final.h5"
-        embeds_model.load_weights(weights_path)
-        #model_path = "output/model/epoch_embeds_bs256_ep280_final.h5"
-        #embeds_model = keras.models.load_model(model_path)
-        for face_embedding in face_embeddings:
-            length = len(face_embeddings_database)
-            h = face_embeddings[0].shape[0]
-            shape = (length,h,1)
-            pairs = [np.zeros(shape, dtype=float) for i in range(2)]
-            pairs[0] = np.tile(np.array(face_embedding), (length,1)).reshape(shape)
-            pairs[1] = np.array(face_embeddings_database).reshape(shape)
-            probs = embeds_model.predict(pairs)
-            matches = [step_func(match) for match in probs]
-            # name = "unknown"
-            if True in matches:
-                face_labels.append(1)
-                # first_match_index = matches.index(True)
-                # name = face_dict_database[first_match_index]
-            else:
-                face_labels.append(0)
+    if len(face_embeddings_database) > 1:
+        if method == 'direct':
+            for face_embedding in face_embeddings:
+                pass
+        elif method == 'compare':
+            for face_embedding in face_embeddings:
+                matches = face_recognition.compare_faces(face_embeddings_database, face_embedding, tolerance=1-similarity)
+                #name = "unknown"
+                if True in matches:
+                    face_labels.append(1)
+                    #first_match_index = matches.index(True)
+                    #name = face_dict_database[first_match_index]
+                else:
+                    face_labels.append(0)
+        elif method == 'siamese':
+            embeds_shape = face_embeddings_database[0].shape
+            embeds_model = face_models.init_siamse_model((embeds_shape), api='embeds')
+            optimizer = keras.optimizers.Adam(lr=0.00006)
+            embeds_model.compile(loss="binary_crossentropy",optimizer=optimizer, metrics='accuracy')
+            weights_path = "output/model/weights/epoch_embeds_bs256_ep280_final.h5"
+            embeds_model.load_weights(weights_path)
+            #model_path = "output/model/epoch_embeds_bs256_ep280_final.h5"
+            #embeds_model = keras.models.load_model(model_path)
+            for face_embedding in face_embeddings:
+                length = len(face_embeddings_database)
+                h = face_embeddings[0].shape[0]
+                shape = (length,h,1)
+                pairs = [np.zeros(shape, dtype=float) for i in range(2)]
+                pairs[0] = np.tile(np.array(face_embedding), (length,1)).reshape(shape)
+                pairs[1] = np.array(face_embeddings_database).reshape(shape)
+                probs = embeds_model.predict(pairs)
+                matches = [step_func(match) for match in probs]
+                # name = "unknown"
+                if True in matches:
+                    face_labels.append(1)
+                    # first_match_index = matches.index(True)
+                    # name = face_dict_database[first_match_index]
+                else:
+                    face_labels.append(0)
+        else:
+            print('no faces to check with')
+            face_labels = []
     return face_labels
 
 

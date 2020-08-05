@@ -106,7 +106,7 @@ def delete(database_path: str, to_delete: str, image_path: str = None, face: str
             conn.close()
             print('face ({}) from image ({}) was deleted'.format(face, image_path))
         elif image_path is None and face is not None:
-            # to delete specific face in image
+            # to delete specific face
             conn = lite.connect(database_path)
             with conn:
                 cur = conn.cursor()
@@ -116,3 +116,5 @@ def delete(database_path: str, to_delete: str, image_path: str = None, face: str
             print('face ({}) was deleted'.format(face))
         else:
             print('Error: face or image path is not provided')
+    else:
+        print('Error: "{}" is unknown delete option!'.format(to_delete))
