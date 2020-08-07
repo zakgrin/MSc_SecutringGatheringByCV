@@ -2,6 +2,7 @@ import face_recognition
 import os
 import re
 import time
+from datetime import datetime
 # import PIL
 import cv2
 import numpy as np
@@ -78,32 +79,36 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
         ort_session = ort.InferenceSession(onnx_path)
         input_name = ort_session.get_inputs()[0].name
         threshold = 0.8
-        if report:
-            print('Model onnx was loaded with threshold of {}'.format(threshold))
+        if report: print('Model onnx was loaded with threshold of {}'.format(threshold))
     # to calc processing time
     process_time = []
-    file_flag = True
+    path_flag = True
     channels = 'RGB'
+    # window specs
+    cv2.namedWindow('Output Image', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('Output Image', 1600, 900)
+    cv2.moveWindow('Output Image', 0, 0)
     # check if it is an image array
     if isinstance(images_folder, np.ndarray):
         listdir = [images_folder]
-        file_flag = False
+        path_flag = False
         return_flag = True
-        print('an image array was provided')
-    # check if it is not a folder
+        if report: print('an image array was provided')
+    # if not an image, check if it is file path (not a folder path)
     elif not os.path.isdir(images_folder):
         image_file = os.path.basename(images_folder)
         images_folder = os.path.dirname(images_folder)
         listdir = [image_file]
         return_flag = True
-        print('an image path was provided')
-    # if it is an image array or file, then give a list of files inside the folder but no return
+        if report: print('an image path was provided')
+    # if it is not an image array or file path, then it is a folder
+    # give a list of files inside the folder but no return
     else:
         listdir = os.listdir(images_folder)
         return_flag = False
         return_option = None
-        print('a folder of images was provided')
-    if file_flag:
+        if report: print('a folder of images was provided')
+    if path_flag:
         # creating output folder if it does not exist
         images_folder_result = "output" + re.split('input',images_folder)[1] + "_result"
         if not os.path.exists(images_folder_result):
@@ -118,16 +123,19 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
         faces_dict = {'face': [], 'path': [], 'location': [], 'embedding': []}
     # loop through all files
     for image_file in listdir:
-        if file_flag:
+        if path_flag:
             # save image paths to read/save the image file
             image_path = os.path.join(images_folder, image_file)
             result_image_path = os.path.join(images_folder_result, image_file)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+            label_option = 'select'
         else:
             image = image_file
-            image_file = 'image'
+            #image_time = datetime.now().strftime('%Y/%m/%d-%H:%M:%S')
+            image_file = datetime.now().strftime('%Y/%m/%d-%H:%M:%S')#'image'
             image_path = 'webcam'
             channels = 'BGR'
+            label_option = 'all'
         # start processing time
         start_time = time.time()
         # calc face locations based on the selected model
@@ -156,8 +164,8 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
                 faces_dict['location'].append(face_locations[i])
                 faces_dict['embedding'].append(face_embeddings[i])
         # save face dict in database:
-        if save_face_dict:# and not file_flag:
-            save_faces_dict(image_path, label_option='select')
+        if save_face_dict:# and not path_flag:
+            save_faces_dict(image_path=image_path, label_option=label_option, faces_dict=faces_dict)
         # classify faces
         if classify_faces:
             face_labels = compare_faces(face_embeddings)
@@ -184,7 +192,7 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
                                                      show_landmarks=show_landmarks)
         # image output format
         if show_images:
-            cv2.imshow('output image', labeled_image)
+            cv2.imshow('Output Image', labeled_image)
             cv2.waitKey(0)
         if show_axes:
             plt.imshow(cv2.cvtColor(labeled_image, cv2.COLOR_BGR2RGB))
@@ -194,10 +202,8 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
     # when finish close all windows (when imshow with different window names)
     if show_images:
         cv2.destroyAllWindows()
-    # final report
-    if report:
-        # print average processing time
-        print('Avg Proc Time [sec]: ', round(np.mean(process_time), 2))
+    # final report, print average processing time
+    if report: print('Avg Proc Time [sec]: ', round(np.mean(process_time), 2))
     # if a single file, then return values based on return option
     if return_flag:
         if return_option == 'locations':
@@ -231,6 +237,10 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
     # set report and loop parameters
     process_time = []
     i = 0
+    cv2.namedWindow('Webcam', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('Webcam', 1600, 900)
+    cv2.moveWindow('Webcam', 0, 0)
+
     # loop infinitely until the exit condition
     while True:
         # read a frame from the Webcam
@@ -261,14 +271,14 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
             face_labels = None
         if save_face_dict and i < 2:
             if len(face_locations) > 0:
-                result = save_faces_dict(frame, label_option='select')
+                result = save_faces_dict(frame, label_option='all')
                 if result:
                     i += 1
 
         # add face calc processing time (locations, embeddings, landmarks)
         process_time.append(round(time.time() - start_time, 2))
-        report_dict = {'process_time':process_time[-1],'labels_probs':labels_probs, 'channels':'BGR',
-                       'face_labels':face_labels}
+        report_dict = {'process_time': process_time[-1], 'labels_probs': labels_probs, 'channels': 'BGR',
+                       'face_labels': face_labels}
         labeled_frame = face_draw.face_locations(image=frame,
                                                  report_dict=report_dict,
                                                  face_locations=face_locations,
@@ -276,7 +286,7 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
                                                  lib=lib,
                                                  label_faces=True,
                                                  show_points=False,
-                                                 show_landmarks=False)
+                                                 show_landmarks=show_landmarks)
         # show the labeled frame
         cv2.imshow('Webcam', labeled_frame)
         # exit condition from the while loop
@@ -290,14 +300,15 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
     print('Avg Proc Time [sec]: ', round(np.mean(process_time), 2))
 
 
-def save_faces_dict(image_path, face_numbers=None, label_option='select', database='database/faces.db'):
+def save_faces_dict(image_path, face_numbers=None, label_option='select', database='database/faces.db', faces_dict=None):
     # todo: problems if a folder is provided!
     # label option: predefined
     if label_option == 'predefined' or label_option == 'all':
         # calc face dict for the image
-        faces_dict = detect_faces_in_images(image_path, model='onnx', lib='pil', report=False, show_images=False,
-                                            save_images=False, label_faces=False, show_axes=False, save_face_dict=False,
-                                            show_landmarks=False, return_option='dict', classify_faces=False)
+        if faces_dict is None:
+            faces_dict = detect_faces_in_images(image_path, model='onnx', lib='pil', report=False, show_images=False,
+                                                save_images=False, label_faces=False, show_axes=False, save_face_dict=False,
+                                                show_landmarks=False, return_option='dict', classify_faces=False)
         if face_numbers is None and label_option != 'all':
             print('face_numbers argument was not defined, all faces will be saved!')
         elif face_numbers:
@@ -314,9 +325,10 @@ def save_faces_dict(image_path, face_numbers=None, label_option='select', databa
     # label option: selective
     elif label_option == 'select' or label_option == 'unselect':
         # calc face dict for the image
-        faces_dict = detect_faces_in_images(image_path, model='onnx', lib='pil', report=False, show_images=True,
-                                            save_images=False, label_faces=True, show_axes=False, save_face_dict=False,
-                                            show_landmarks=False, return_option='dict', classify_faces=False)
+        if faces_dict is None:
+            faces_dict = detect_faces_in_images(image_path, model='onnx', lib='pil', report=False, show_images=True,
+                                                save_images=False, label_faces=True, show_axes=False, save_face_dict=False,
+                                                show_landmarks=False, return_option='dict', classify_faces=False)
         num_faces = len(faces_dict['location'])
         if label_option == 'select':
             inputs = input('please select faces - list of face numbers (enter [n] to cancel): ')
