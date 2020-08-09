@@ -1,9 +1,13 @@
+# Usage
+# python FaceDetect.py v --path 0
+
+
 import argparse
 from utilities import face_detect
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()#formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     subparser = parser.add_subparsers(help='selection', dest='option')
     # image parser
     image_parser = subparser.add_parser('image', aliases=['i'], help='image option')
@@ -32,19 +36,19 @@ if __name__ == '__main__':
     image_parser.add_argument('-c', '--classify', default=False, type=bool, metavar='',
                               help="classify faces [True, False]")
     # video parser
-    video_parser = subparser.add_parser('video', aliases=['v'], help='video option')
-    video_parser.add_argument('-p', '--path', default='input/videos/lunch_scene.mp4', metavar='',
-                              help='video file path')
+    video_parser = subparser.add_parser('video', aliases=['v'], formatter_class=argparse.RawTextHelpFormatter,
+                                        help="video option"
+                                             "\n(press 'space' to register a face)")
+    video_parser.add_argument('-p', '--path', default='0', metavar='',
+                              help="video file path \n(default: Webcam)")
     video_parser.add_argument('-m', '--model', default='onnx', type=str, metavar='',
-                              help="  face detection model ['onnx', 'hog']")
+                              help="face detection model ['onnx', 'hog'] \n(default: 'onnx')")
     video_parser.add_argument('-lib', '--library', default='pil', type=str, metavar='',
-                              help="image annotation library ['pil', 'cv2']")
-    video_parser.add_argument('-c', '--classify', default=False, type=bool, metavar='',
-                              help="classify faces [True, False]")
-    video_parser.add_argument('-lm', '--landmarks', default=False, type=bool, metavar='',
-                              help="show faces landmarks [True, False]")
-    video_parser.add_argument('-d', '--save_dict', default=False, type=bool, metavar='',
-                              help="save faces dictionary [True, False]")
+                              help="image annotation library ['pil', 'cv2'] \n(default: 'pil')")
+    video_parser.add_argument('-c', '--classify', default=False, action='store_true',
+                              help="classify faces")
+    video_parser.add_argument('-lm', '--landmarks', default=False, action='store_true',
+                              help="show faces landmarks")
 
     args = parser.parse_args()
     if args.option in ['i', 'image', 'images']:
@@ -67,5 +71,4 @@ if __name__ == '__main__':
                                            model=args.model,
                                            lib=args.library,
                                            classify_faces=args.classify,
-                                           show_landmarks=args.landmarks,
-                                           save_face_dict=args.save_dict)
+                                           show_landmarks=args.landmarks)

@@ -85,9 +85,10 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
     path_flag = True
     channels = 'RGB'
     # window specs
-    cv2.namedWindow('Output Image', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Output Image', 1600, 900)
-    cv2.moveWindow('Output Image', 0, 0)
+    if show_images:
+        cv2.namedWindow('Output Image', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('Output Image', 1600, 900)
+        cv2.moveWindow('Output Image', 0, 0)
     # check if it is an image array
     if isinstance(images_folder, np.ndarray):
         listdir = [images_folder]
@@ -220,8 +221,7 @@ def detect_faces_in_images(images_folder, model='onnx', lib='pil', report=True, 
             return faces_dict
 
 
-def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces=False, show_landmarks=False,
-                           save_face_dict=True):
+def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces=False, show_landmarks=False):
     # load the model if requested (0.04 sec to load)
     if model == 'onnx':
         onnx_path = "utilities/models/onnx/fixed_version-RFB-640.onnx"
@@ -236,7 +236,6 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
         raise IOError("Cannot open Webcam")
     # set report and loop parameters
     process_time = []
-    i = 0
     cv2.namedWindow('Webcam', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('Webcam', 1600, 900)
     cv2.moveWindow('Webcam', 0, 0)
@@ -269,11 +268,6 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
             face_labels = compare_faces(face_embeddings)
         else:
             face_labels = None
-        if save_face_dict and i < 2:
-            if len(face_locations) > 0:
-                result = save_faces_dict(frame, label_option='all')
-                if result:
-                    i += 1
 
         # add face calc processing time (locations, embeddings, landmarks)
         process_time.append(round(time.time() - start_time, 2))
@@ -291,8 +285,11 @@ def detect_faces_in_videos(video_path=0, model='onnx', lib='pil', classify_faces
         cv2.imshow('Webcam', labeled_frame)
         # exit condition from the while loop
         c = cv2.waitKey(1)
-        if c == 27:
+        if c == 27: # press 'Esc' to exit
             break
+        elif c == 32: # press 'Space' to register
+            if len(face_locations) > 0:
+                save_faces_dict(frame, label_option='all')
     # release the cap and close all windows
     cap.release()
     cv2.destroyAllWindows()
@@ -385,7 +382,7 @@ def train_face_classifier(database_path='faces.db'):
     print('face recognition classifier was trained successfully!')
 
 
-def compare_faces(face_embeddings, method='siamese', similarity=0.6):  # or recognize face
+def compare_faces(face_embeddings, method='siamese', similarity=0.55):  # or recognize face
     face_dict_database = face_database.retrieve('database/faces.db')
     face_embeddings_database = face_dict_database['embedding']
     face_labels = []
@@ -434,9 +431,10 @@ def compare_faces(face_embeddings, method='siamese', similarity=0.6):  # or reco
                     # name = face_dict_database[first_match_index]
                 else:
                     face_labels.append(0)
-        else:
-            print('no faces to check with')
-            face_labels = []
+    else:
+        # no faces to check with
+        face_labels = []
+
     return face_labels
 
 

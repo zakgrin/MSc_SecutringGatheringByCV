@@ -1,14 +1,8 @@
-
 import numpy as np
-
-
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras import backend as K
-
-
-
 
 
 def init_weights(shape, dtype=None, name=None):

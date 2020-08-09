@@ -28,7 +28,7 @@ def delete_option(database, all=False, image=None, face=None):
     elif face and image:
         face_database.delete(database_path=database, to_delete='face', image_path=image, face=face)
     else:
-        print('No delete option was selected! (options: all, image, face)')
+        print('No delete option was selected! (options: --all, --image, --face)')
 
 
 def save_option(database, label_opt='select', image=None, faces=None):
