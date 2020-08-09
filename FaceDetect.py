@@ -2,22 +2,6 @@ import argparse
 from utilities import face_detect
 
 
-def main(path):
-
-    if option:
-        pass
-    face_detect.detect_faces_in_images(images_folder,
-                                       model='onnx',
-                                       lib=lib,
-                                       report=True,
-                                       show_images=True,
-                                       save_images=True,
-                                       label_faces=True,
-                                       classify_faces=True,
-                                       show_landmarks=False,
-                                       save_face_dict=save_dict)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()#formatter_class=argparse.RawDescriptionHelpFormatter)
     subparser = parser.add_subparsers(help='selection', dest='option')
