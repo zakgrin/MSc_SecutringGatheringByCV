@@ -12,10 +12,10 @@ def print_option(database, select=None):
         print('There are {} faces saved in the database ({}) as following:'.format(n_faces, database))
         if select in ['a', 'all']:
             print(faces_dict_database)
-        elif select in ['face', 'path', 'location', 'embeddings']:
+        elif select in ['face', 'path', 'location', 'embedding']:
             print(faces_dict_database[select])
         else:
-            print('Error: unknown argument ({}) for print option!'.format(arg))
+            print('Error: unknown argument ({}) for print option!'.format(select))
 
 
 def delete_option(database, all=False, image=None, face=None):
@@ -70,8 +70,8 @@ if __name__ == '__main__':
                               help="select key to print:"
                                    "\n\t- all: print all values"
                                    "\n\t- face: print face names"
-                                   "\n\t- locations: print face locations"
-                                   "\n\t- embeddings: print face embeddings"
+                                   "\n\t- location: print face locations"
+                                   "\n\t- embedding: print face embeddings"
                                    "\n\t(default: face)")
     # delete option
     delete_parser = subparser.add_parser('delete', aliases=['d'], help='delete',
