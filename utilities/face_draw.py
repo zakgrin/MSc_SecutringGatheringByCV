@@ -21,16 +21,18 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = PIL.Image.fromarray(image)
         # create draw object
-        draw = PIL.ImageDraw.Draw(image)
+        draw = PIL.ImageDraw.Draw(image, 'RGBA')
         # draw text on top of the image
         font_list = ["arial.ttf", "handwriting-markervalerieshand-regular.ttf", "Drawing_Guides.ttf"]
         font = PIL.ImageFont.truetype("input/fonts/" + font_list[0], 22)
+        # transparancy
+        trans = int(255 * 0.5)
         # loop in face locations
         for i in range(len(face_locations)):
             # check if person registered
-            c = "red"
+            c = (255,0,0,trans) #"red"
             if face_labels:
-                if face_labels[i]: c = "green"
+                if face_labels[i]: c = (0,255,0,trans) #"green"
             # draw face locations
             top, right, bottom, left = face_locations[i]
 
@@ -57,7 +59,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
                 # put text on label box
                 draw.text((left, bottom),
                           text,
-                          fill='blue',
+                          fill=(0,0,255,trans),#'blue'
                           font=face_font)
         # show faces landmarks
         if show_landmarks and face_landmarks:
@@ -67,10 +69,10 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         # summary on top of the image
         text = "Number of Faces = {} ({} seconds)".format(number_of_faces, process_time)
         width, height = font.getsize(text) # or draw.textsize(text, font=font)
-        draw.rectangle([10, 10, width+10, height+10], fill='white')
+        draw.rectangle([10, 10, width+10, height+10], fill=(255,255,255,trans)) #'white'
         draw.text((10, 10),
                   text,
-                  fill='blue',
+                  fill=(0,0,255,trans), #'blue'
                   font=font)
         # return to BGR
         image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -79,6 +81,8 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         # if RGB: convert to BGR
         if channels.lower() == 'RGB'.lower():
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        # todo: add ovelay to include transparency in rectagle
+        # code ..
         # loop in face locations
         for i in range(len(face_locations)):
             top, right, bottom, left = face_locations[i]
