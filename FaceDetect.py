@@ -7,9 +7,18 @@ from utilities import face_detect
 
 
 if __name__ == '__main__':
+    # Define the main parser
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+
+    # Database path (used with all options)
+    parser.add_argument('-db', '--database', default='database/faces.db', metavar='',
+                    help="Face database path"
+                         "\n(default: 'database/faces.db')")
+
+    # Add subparsers for options
     subparser = parser.add_subparsers(help='selection', dest='option')
-    # image parser
+
+    # Option 1: image
     image_parser = subparser.add_parser('image', aliases=['i'], formatter_class=argparse.RawTextHelpFormatter,
                                         help='image option')
     image_parser.add_argument('-p', '--path', default='input/imgs', type=str, metavar='',
@@ -38,7 +47,8 @@ if __name__ == '__main__':
                               help="classify faces [True, False]")
     image_parser.add_argument('-c', '--classify', default=False, type=bool, metavar='',
                               help="classify faces [True, False]")
-    # video parser
+
+    # Option 2: video
     video_parser = subparser.add_parser('video', aliases=['v'], formatter_class=argparse.RawTextHelpFormatter,
                                         help="video option"
                                              "\n(press 'space' to register a face)")
@@ -48,8 +58,8 @@ if __name__ == '__main__':
                                    "\n(default: path=0: Webcam)")
     video_parser.add_argument('-m', '--detector', default='onnx', type=str, metavar='',
                               help="face detector ['onnx', 'hog'] \n(default: 'onnx')")
-    video_parser.add_argument('-r', '--recognizer', default='face_recognition', type=str, metavar='',
-                              help="face detector ['facenet', 'face_recignition'] \n(default: 'facenet')")
+    video_parser.add_argument('-r', '--recognizer', default='facenet2', type=str, metavar='',
+                              help="face detector ['face_recognition', 'facenet1', 'facenet2'] \n(default: 'facenet1')")
     video_parser.add_argument('-lib', '--library', default='pil', type=str, metavar='',
                               help="image annotation library ['pil', 'cv2'] \n(default: 'pil')")
     video_parser.add_argument('-c', '--classify', default=False, action='store_true',
@@ -80,6 +90,7 @@ if __name__ == '__main__':
             args.path = "http://192.168.0.101:8080/video"
             print('please make sure that webcam feeds are send to IP address: ', args.path)
         face_detect.detect_faces_in_videos(video_path=args.path,
+                                           database=args.database,
                                            detector=args.detector,
                                            recognizer=args.recognizer,
                                            lib=args.library,
