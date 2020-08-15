@@ -26,17 +26,23 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         font_list = ["arial.ttf", "handwriting-markervalerieshand-regular.ttf", "Drawing_Guides.ttf"]
         font = PIL.ImageFont.truetype("input/fonts/" + font_list[0], 22)
         # transparancy
-        trans = int(255 * 0.5)
+        trans = int(255*0.5)
         # loop in face locations
         for i in range(len(face_locations)):
             # check if person registered
             c = (255,0,0,trans) #"red"
+            # If face_labels is not None, then convert Trues into green color with registered label
             if face_labels:
-                if face_labels[i]: c = (0,255,0,trans) #"green"
+                if face_labels[i]:
+                    c = (0,255,0,trans) #"green"
+                    labels_probs[i] = 'registered'
             # draw face locations
             top, right, bottom, left = face_locations[i]
 
-            draw.rectangle([left, top, right, bottom], fill=None, outline=c, width=5)
+            #draw.rectangle([left, top, right, bottom], fill=c, outline=c, width=5)
+            draw.rectangle([left, top, right, bottom], fill=(100,100,100,trans), width=5)
+            rad = (right-left)*0.15
+            draw.ellipse((right-rad, top-rad, right+rad, top+rad), fill=c) # top right
             # show vertex points for debugging
             if show_points:
                 draw.ellipse((left - 5, top - 5, left + 5, top + 5), fill="yellow") # top left
@@ -47,7 +53,8 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
             if label_faces:
                 # draw label box below face location
                 bottom_ = bottom + int(0.2 * (bottom - top))
-                draw.rectangle([left, bottom, right, bottom_],fill=c, outline=c, width=5)
+                #draw.rectangle([left, bottom, right, bottom_], fill=c, outline=c, width=5)
+                draw.rectangle([left, bottom, right, bottom_], fill=c, width=5)
                 # find text size based on the label box size
                 text = "{}.{}".format(i + 1, labels_probs[i])
                 face_font_size = 0
@@ -59,7 +66,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
                 # put text on label box
                 draw.text((left, bottom),
                           text,
-                          fill=(0,0,255,trans),#'blue'
+                          fill=(0,0,0,trans),#'black'
                           font=face_font)
         # show faces landmarks
         if show_landmarks and face_landmarks:
@@ -72,7 +79,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         draw.rectangle([10, 10, width+10, height+10], fill=(255,255,255,trans)) #'white'
         draw.text((10, 10),
                   text,
-                  fill=(0,0,255,trans), #'blue'
+                  fill=(0,0,0,trans), #'black'
                   font=font)
         # return to BGR
         image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
