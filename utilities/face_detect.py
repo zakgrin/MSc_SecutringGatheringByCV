@@ -3,7 +3,7 @@ import os
 import re
 import time
 from datetime import datetime
-# import PIL
+import PIL
 import cv2
 import numpy as np
 from tensorflow import keras
@@ -14,10 +14,14 @@ from utilities import face_database
 from utilities import face_draw
 from utilities import face_models
 
+# Face detector
 import utilities.vision.utils.box_utils_numpy as box_utils
 # from caffe2.python.onnx import backend
 # onnx runtime
 import onnxruntime as ort
+
+# Face recognizer (facenet: option 1)
+from utilities.models.facenet1.inception_resnet_v1 import InceptionResNetV1
 
 
 def onnx_order_face_locations(face_locations):
@@ -66,7 +70,8 @@ def onnx_image_preprocessing(image, size=(640, 480)): #(320, 240)
 
 
 def facenet_preprocessing(frame, face_locations=None):
-    # image/frame must be provided as RGB
+    # image/frame must be provided as RGB > target size must be 160X160
+    # https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
     faces = []
     if face_locations:
         # if we have face locations, then extract all faces
@@ -78,15 +83,21 @@ def facenet_preprocessing(frame, face_locations=None):
             enlarge an image, it will generally look best with c#INTER_CUBIC (slow) or #INTER_LINEAR
             (faster but still looks OK).
             """
-            face_image = cv2.resize(face_image, (160, 160))#, interpolation=cv2.INTER_CUBIC)
-            faces.append(face_image)
+            # Resize image:
+            try:
+                face_image = cv2.resize(face_image, (160, 160))#, interpolation=cv2.INTER_CUBIC)
+                faces.append(face_image)
+            except cv2.error:
+                faces.append(np.zeros((160,160,3), dtype='float32'))
     else:
-        # else, if the image is already a face image
-        face_image = cv2.resize(frame, (160, 160))#, interpolation=cv2.INTER_CUBIC)
-        faces.append(face_image)
-    # faces = np.stack(faces)
-    faces = np.asarray(faces).astype('float32')
+        try:
+            face_image = cv2.resize(frame, (160, 160))  # , interpolation=cv2.INTER_CUBIC)
+            faces.append(face_image)
+        except cv2.error:
+            faces.append(np.zeros((160, 160, 3), dtype='float32'))
+    faces = np.asarray(faces).astype('float32') # or faces = np.stack(faces)
     mean, std = faces.mean(), faces.std()
+    if std == 0: std = 1 # to avoid warning when std=0 due to cv2.error exception
     faces = (faces - mean) / std
     # expand_dims(face_pixels, axis=0)
     return faces
@@ -100,7 +111,7 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
         label_path = "utilities/models/voc-model-labels.txt"
         class_names = [name.strip() for name in open(label_path).readlines()]
         onnx_path = "utilities/models/onnx/fixed_version-RFB-640.onnx"
-        predictor = onnx.load(onnx_path)
+        # predictor = onnx.load(onnx_path)
         # onnx.checker.check_model(predictor)
         # onnx.helper.printable_graph(predictor.graph)
         # predictor = backend.prepare(predictor, device="CPU")  # default CPU
@@ -108,10 +119,12 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
         input_name = ort_session.get_inputs()[0].name
         threshold = 0.8
         if report: print('Face detector (onnx) was loaded with threshold of {}'.format(threshold))
-    if recognizer == 'facenet':
-        facenet_path = "utilities/models/facenet_keras.h5"
+    if recognizer == 'facenet1':
+        pass
+    elif recognizer == 'facenet2':
+        facenet_path = "utilities/models/facenet2/facenet_keras.h5"
         facenet_model = keras.models.load_model(facenet_path, compile=False)
-        if report: print('Face recognizer (facenet) was loaded')
+        if report: print('Face recognizer (facenet2) was loaded')
     # to calc processing time
     process_time = []
     path_flag = True
@@ -257,79 +270,112 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
             return faces_dict
 
 
-def detect_faces_in_videos(video_path=0, database='database/faces.db', detector='onnx', recognizer='face_recognition', lib='pil', classify_faces=False, show_landmarks=False):
-    # load the detector if requested (0.04 sec to load)
+def detect_faces_in_videos(video_path=0, database='database/faces.db', detector='onnx', recognizer='face_recognition',
+                           lib='pil', classify_faces=False, show_landmarks=False):
+
+    # Load face detector model
     if detector == 'onnx':
         onnx_path = "utilities/models/onnx/fixed_version-RFB-640.onnx"
-        predictor = onnx.load(onnx_path)
         ort_session = ort.InferenceSession(onnx_path)
         input_name = ort_session.get_inputs()[0].name
         threshold = 0.8
         print('face detector {} was loaded'.format(detector))
-    if recognizer == 'facenet':
-        facenet_path = "utilities/models/facenet_keras.h5"
+
+    # Load face recognizer model
+    if recognizer == 'facenet1' or recognizer == 'facenet':
+        if recognizer == 'facenet': recognizer = 'facenet1'
+        recognizer_check = 'siamese'
+        similarity = 0.65
+        # https://sefiks.com/2018/09/03/face-recognition-with-facenet-in-keras/
+        # https://github.com/serengil/tensorflow-101/blob/master/model/inception_resnet_v1.py
+        facenet_model = InceptionResNetV1()
+        # https://drive.google.com/file/d/1971Xk5RwedbudGgTIrGAL4F7Aifu7id1/view?usp=sharing
+        weights_path = "utilities/models/facenet1/facenet_weights.h5"
+        facenet_model.load_weights(weights_path)
+    elif recognizer == 'facenet2':
+        recognizer_check = 'siamese'
+        similarity = 0.60
+        # https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
+        # https://github.com/nyoki-mtl/keras-facenet
+        facenet_path = "utilities/models/facenet2/facenet_keras.h5"
         facenet_model = keras.models.load_model(facenet_path, compile=False)
-        print('face recognizer {} was loaded'.format(recognizer))
     else:
-        print('face recognizer for {} will be used'.format(recognizer))
-    if classify_faces:
+        recognizer = 'face_recognition'
+        recognizer_check = 'compare' # or 'siamese'
+        if recognizer_check != 'siamese':
+            embeds_model = None
+        similarity = 0.55 if recognizer_check == 'compare' else 0.6
+    print('face recognizer ({}) was loaded'.format(recognizer))
+
+    # Load face similarity model
+    if classify_faces and recognizer_check == 'siamese':
         embeds_shape = (128, 1) # face_embeddings_database[0].shape
-        embeds_model = face_models.init_siamse_model((embeds_shape), api='embeds')
-        weights_path = "output/siamese_model/weights/epoch_embeds_bs256_ep680_test_best.h5" # 94% on Nway_test
+        embeds_model = face_models.init_siamse_model((embeds_shape), app='embeds', learn='after_l2')
+        weights_path = "output/siamese_model/embeds_after_l2/"+recognizer+'_epoch_embeds_bs256_ep600_test_best.h5'
         embeds_model.load_weights(weights_path)
-        # model_path = "output/siamese_model/epoch_embeds_bs256_ep680_test_best.h5"
-        # embeds_model = keras.models.load_model(model_path, compile=False)
         print('face {} similarity model was loaded'.format('siamese'))
 
-    # read the video
+    # Read video cap
     cap = cv2.VideoCapture(video_path)
-    # check if the Webcam is opened correctly
+    # Check if the webcam is opened correctly
     if not cap.isOpened():
         raise IOError("Cannot open Webcam")
-    # set report and loop parameters
+
+    # Set report and loop parameters
     process_time = []
     cv2.namedWindow('Webcam', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('Webcam', 1600, 900)
     cv2.moveWindow('Webcam', 0, 0)
 
-    # loop infinitely until the exit condition
+    # Loop infinitely until the exit condition
+    # - press 'Esc' to exit
+    # - press 'Space' to register a face in face database
     while True:
-        # read a frame from the Webcam
+
+        # Read a frame from the Webcam
         ret, frame = cap.read()
-        # frame = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
-        # start processing time
+
+        # Start time
         start_time = time.time()
-        # calc face locations based on the selected detector
+
+        # Calc face locations based on the selected face detector
         if detector == 'onnx':
             processed_frame = onnx_image_preprocessing(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             confidences, boxes = ort_session.run(None, {input_name: processed_frame})
             face_locations, labels, probs = onnx_predict(frame.shape[1], frame.shape[0], confidences, boxes, threshold)
             face_locations = onnx_order_face_locations(face_locations)
-            labels_probs = [(f"face({probs[i]:.2f})") for i in range(len(face_locations))]
+            #labels_probs = [(f"face({probs[i]:.2f})") for i in range(len(face_locations))]
         elif detector == 'hog':
             face_locations = face_recognition.face_locations(frame)
-            labels_probs = [(f"face(?)") for i in range(len(face_locations))]
-        # calc face landmarks if requested
+            #labels_probs = [(f"face(?)") for i in range(len(face_locations))]
+
+        # Create 'outsider' label for all detected faces
+        labels_probs = ['outsider'] * len(face_locations)
+
+        # Calc face landmarks if requested
         if show_landmarks:
             face_landmarks = face_recognition.face_landmarks(frame, face_locations)
         else:
             face_landmarks = None
-        # calc face embeddings if requested (to recognize faces)
+
+        # Calc face embeddings if requested (to recognize faces)
         if classify_faces and len(face_locations) > 0:
-            if recognizer == 'facenet':
+            if recognizer == 'facenet' or recognizer == 'facenet1' or recognizer == 'facenet2':
                 faces = facenet_preprocessing(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), face_locations)
                 face_embeddings = facenet_model.predict(faces)
                 face_embeddings = [face_embedding for face_embedding in face_embeddings]#.astype('float64')
-                #print(len(face_embeddings), face_embeddings[0].shape, face_embeddings[0].dtype, type(face_embeddings[0][0]))
             elif recognizer == 'face_recognition':
                 face_embeddings = face_recognition.face_encodings(frame, known_face_locations=face_locations, model='small')
-                #print(len(face_embeddings), face_embeddings[0].shape, face_embeddings[0].dtype, type(face_embeddings[0][0]))
-            face_labels = compare_faces(face_embeddings, method='siamese', embeds_model=embeds_model)
+            # compare faces' embeddings with database embeddings to find matches
+            face_labels = compare_faces(database, face_embeddings, method=recognizer_check, embeds_model=embeds_model,
+                                        similarity=similarity)
         else:
             face_labels = None
 
-        # add face calc processing time (locations, embeddings, landmarks)
+        # Calc processing time
         process_time.append(round(time.time() - start_time, 2))
+
+        # Label frame
         report_dict = {'process_time': process_time[-1], 'labels_probs': labels_probs, 'channels': 'BGR',
                        'face_labels': face_labels}
         labeled_frame = face_draw.face_locations(image=frame,
@@ -340,30 +386,36 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
                                                  label_faces=True,
                                                  show_points=False,
                                                  show_landmarks=show_landmarks)
-        # show the labeled frame
+
+        # Show the labeled frame
         cv2.imshow('Webcam', labeled_frame)
-        # exit condition from the while loop
+
+        # Exit condition from the while loop
         c = cv2.waitKey(1)
-        if c == 27: # press 'Esc' to exit
+        # press 'Esc' to exit
+        if c == 27:
             break
-        elif c == 32 and len(face_locations) > 0 and database is not None: # press 'Space' to register
-            #save_faces_dict(frame, label_option='all')
+        # press 'Space' to register a face in the database
+        elif c == 32 and len(face_locations) > 0 and database is not None:
             faces_dict = {'face': [], 'path': [], 'location': [], 'embedding': []}
-            name = datetime.now().strftime('%Y/%m/%d-%H:%M:%S')#'image'
+            name = datetime.now().strftime('%Y/%m/%d-%H:%M:%S')
             for i in range(len(face_embeddings)):
                 faces_dict['face'].append(name + os.path.sep + 'face_' + str(i))
                 faces_dict['path'].append('webcam')
                 faces_dict['location'].append(face_locations[i])
                 faces_dict['embedding'].append(face_embeddings[i])
             face_database.save(database, faces_dict)
-            print('embeddings were saved in the database ({})'.format(database))
+            print('face embeddings were saved in the database ({})'.format(database))
         elif database is None:
             print('Error: please specify database path')
+        else:
+            continue
 
-    # release the cap and close all windows
+    # Release the cap and close all windows
     cap.release()
     cv2.destroyAllWindows()
-    # print average processing time
+
+    # Print average processing time
     print('Avg Proc Time [sec]: ', round(np.mean(process_time), 2))
 
 
@@ -452,8 +504,8 @@ def train_face_classifier(database_path='faces.db'):
     print('face recognition classifier was trained successfully!')
 
 
-def compare_faces(face_embeddings, method='siamese', embeds_model=None, similarity=0.5): #best 0.55
-    face_dict_database = face_database.retrieve('database/faces.db')
+def compare_faces(database_path, face_embeddings, method='siamese', embeds_model=None, similarity=0.55): #best 0.55
+    face_dict_database = face_database.retrieve(database_path)
     face_embeddings_database = face_dict_database['embedding']
     face_labels = []
 
@@ -462,11 +514,8 @@ def compare_faces(face_embeddings, method='siamese', embeds_model=None, similari
             return True
         return False
 
-    if len(face_embeddings_database) > 1:
-        if method == 'direct':
-            for face_embedding in face_embeddings:
-                pass
-        elif method == 'compare':
+    if len(face_embeddings_database) > 0:
+        if method == 'compare':
             for face_embedding in face_embeddings:
                 matches = face_recognition.compare_faces(face_embeddings_database, face_embedding, tolerance=1-similarity)
                 #name = "unknown"
