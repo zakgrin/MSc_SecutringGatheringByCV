@@ -58,7 +58,7 @@ def onnx_predict(width, height, confidences, boxes, prob_threshold, iou_threshol
     return picked_box_probs[:, :4].astype(np.int32), np.array(picked_labels), picked_box_probs[:, 4]
 
 
-def onnx_image_preprocessing(image, size=(640, 480)): #(320, 240)
+def onnx_image_preprocessing(image, size=(640, 480)):  # (320, 240)
     # image must be provided as RGB
     processed_image = cv2.resize(image, (size[0], size[1]))
     image_mean = np.array([127, 127, 127])
@@ -85,26 +85,27 @@ def facenet_preprocessing(frame, face_locations=None):
             """
             # Resize image:
             try:
-                face_image = cv2.resize(face_image, (160, 160))#, interpolation=cv2.INTER_CUBIC)
+                face_image = cv2.resize(face_image, (160, 160))  # , interpolation=cv2.INTER_CUBIC)
                 faces.append(face_image)
             except cv2.error:
-                faces.append(np.zeros((160,160,3), dtype='float32'))
+                faces.append(np.zeros((160, 160, 3), dtype='float32'))
     else:
         try:
             face_image = cv2.resize(frame, (160, 160))  # , interpolation=cv2.INTER_CUBIC)
             faces.append(face_image)
         except cv2.error:
             faces.append(np.zeros((160, 160, 3), dtype='float32'))
-    faces = np.asarray(faces).astype('float32') # or faces = np.stack(faces)
+    faces = np.asarray(faces).astype('float32')  # or faces = np.stack(faces)
     mean, std = faces.mean(), faces.std()
-    if std == 0: std = 1 # to avoid warning when std=0 due to cv2.error exception
+    if std == 0: std = 1  # to avoid warning when std=0 due to cv2.error exception
     faces = (faces - mean) / std
     # expand_dims(face_pixels, axis=0)
     return faces
 
 
-def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_recognition', lib='pil', report=True, show_images=True, save_images=True,
-                           label_faces=True, show_axes=False, show_landmarks=False, save_face_dict=False,
+def detect_faces_in_images(images_folder, database='database/faces.db', detector='onnx', recognizer='facenet',
+                           lib='pil', trans=0.5, report=True, show_images=True, save_images=True,
+                           show_axes=False, show_landmarks=False, save_face_dict=False,
                            return_option='locations', classify_faces=False):
     # load the detector if requested (0.04 sec to load)
     if detector == 'onnx':
@@ -118,13 +119,42 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
         ort_session = ort.InferenceSession(onnx_path)
         input_name = ort_session.get_inputs()[0].name
         threshold = 0.8
-        if report: print('Face detector (onnx) was loaded with threshold of {}'.format(threshold))
-    if recognizer == 'facenet1':
-        pass
-    elif recognizer == 'facenet2':
+        if report: print('Face detector (onnx) was loaded (threshold={})'.format(threshold))
+
+    # Load face recognizer model
+    if classify_faces and (recognizer == 'facenet1' or recognizer == 'facenet'):
+        if recognizer == 'facenet': recognizer = 'facenet1'
+        recognizer_check = 'siamese'
+        similarity = 0.65
+        # https://sefiks.com/2018/09/03/face-recognition-with-facenet-in-keras/
+        # https://github.com/serengil/tensorflow-101/blob/master/model/inception_resnet_v1.py
+        facenet_model = InceptionResNetV1()
+        # https://drive.google.com/file/d/1971Xk5RwedbudGgTIrGAL4F7Aifu7id1/view?usp=sharing
+        weights_path = "utilities/models/facenet1/facenet_weights.h5"
+        facenet_model.load_weights(weights_path)
+    elif classify_faces and recognizer == 'facenet2':
+        recognizer_check = 'siamese'
+        similarity = 0.60
+        # https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
+        # https://github.com/nyoki-mtl/keras-facenet
         facenet_path = "utilities/models/facenet2/facenet_keras.h5"
         facenet_model = keras.models.load_model(facenet_path, compile=False)
-        if report: print('Face recognizer (facenet2) was loaded')
+    else:
+        recognizer = 'face_recognition'
+        recognizer_check = 'compare'  # or 'siamese'
+        if recognizer_check != 'siamese':
+            embeds_model = None
+        similarity = 0.55 if recognizer_check == 'compare' else 0.6
+    print('face recognizer ({}) was loaded'.format(recognizer))
+
+    # Load face similarity model
+    if classify_faces and recognizer_check == 'siamese':
+        embeds_shape = (128, 1)  # face_embeddings_database[0].shape
+        embeds_model = face_models.init_siamse_model((embeds_shape), app='embeds', learn='after_l2')
+        weights_path = "output/siamese_model/embeds_after_l2/" + recognizer + '_epoch_embeds_bs256_ep600_test_best.h5'
+        embeds_model.load_weights(weights_path)
+        print('face {} similarity model was loaded'.format('siamese'))
+
     # to calc processing time
     process_time = []
     path_flag = True
@@ -156,7 +186,7 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
         if report: print('a folder of images was provided')
     if path_flag:
         # creating output folder if it does not exist
-        images_folder_result = "output" + re.split('input',images_folder)[1] + "_result"
+        images_folder_result = "output" + re.split('input', images_folder)[1] + "_result"
         if not os.path.exists(images_folder_result):
             os.makedirs(images_folder_result)
     # values to report at for each file
@@ -174,10 +204,11 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
             image_path = os.path.join(images_folder, image_file)
             result_image_path = os.path.join(images_folder_result, image_file)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+            #image = cv2.resize(image, dsize=(640, 480))
             label_option = 'select'
         else:
             image = image_file
-            image_file = datetime.now().strftime('%Y/%m/%d-%H:%M:%S')#'image'
+            image_file = datetime.now().strftime('%Y/%m/%d-%H:%M:%S')  # 'image'
             image_path = 'webcam'
             channels = 'BGR'
             label_option = 'all'
@@ -189,23 +220,44 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
             confidences, boxes = ort_session.run(None, {input_name: processed_image})
             face_locations, labels, probs = onnx_predict(image.shape[1], image.shape[0], confidences, boxes, threshold)
             face_locations = onnx_order_face_locations(face_locations)
-            labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(len(face_locations))]
+            # labels_probs = [(f"{class_names[labels[i]]}({probs[i]:.2f})") for i in range(len(face_locations))]
         elif detector == 'hog':
             face_locations = face_recognition.face_locations(image, model='hog')
-            labels_probs = [f"face(?)" for i in range(len(face_locations))]
+            # labels_probs = [f"face(?)" for i in range(len(face_locations))]
+
+        # Create 'outsider' label for all detected faces
+        labels_probs = ['outsider'] * len(face_locations)
+
         # calc face landmarks if requested
         if show_landmarks or return_option == 'landmarks':
             face_landmarks = face_recognition.face_landmarks(image, face_locations)
         else:
             face_landmarks = None
+
         # calc face embeddings if requested
-        if return_option == 'embeddings' or return_option == 'dict' or classify_faces or save_face_dict:
+        if (return_option == 'embeddings' or return_option == 'dict' or classify_faces or save_face_dict) and \
+                len(face_locations) > 0:
             if recognizer == 'facenet':
                 faces = facenet_preprocessing(image, face_locations)
                 face_embeddings = facenet_model.predict(faces)
                 face_embeddings = [face_embedding.astype('float32') for face_embedding in face_embeddings]
             elif recognizer == 'face_recognition':
-                face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations, model='small')
+                face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations,
+                                                                  model='small')
+
+            if recognizer == 'facenet1' or recognizer == 'facenet2':
+                faces = facenet_preprocessing(image, face_locations)
+                face_embeddings = facenet_model.predict(faces)
+                face_embeddings = [face_embedding for face_embedding in face_embeddings]  # .astype('float64')
+            elif recognizer == 'face_recognition':
+                face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations,
+                                                                  model='small')
+            # compare faces' embeddings with database embeddings to find matches
+            face_labels = compare_faces(database, face_embeddings, method=recognizer_check, embeds_model=embeds_model,
+                                        similarity=similarity)
+        else:
+            face_labels = None
+
         # save face embeddings in a dict
         if return_option == 'dict' or save_face_dict:
             for i in range(len(face_embeddings)):
@@ -214,13 +266,9 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
                 faces_dict['location'].append(face_locations[i])
                 faces_dict['embedding'].append(face_embeddings[i])
         # save face dict in database:
-        if save_face_dict:# and not path_flag:
+        if save_face_dict:  # and not path_flag:
             save_faces_dict(image_path=image_path, label_option=label_option, faces_dict=faces_dict)
-        # classify faces
-        if classify_faces:
-            face_labels = compare_faces(face_embeddings)
-        else:
-            face_labels = None
+
         # add face calc processing time (locations, embeddings, landmarks)
         process_time.append(round(time.time() - start_time, 2))
         # print step report
@@ -237,7 +285,8 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
                                                      face_locations=face_locations,
                                                      face_landmarks=face_landmarks,
                                                      lib=lib,
-                                                     label_faces=label_faces,
+                                                     trans=trans,
+                                                     label_faces=classify_faces,
                                                      show_points=False,
                                                      show_landmarks=show_landmarks)
         # image output format
@@ -248,6 +297,7 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
             plt.imshow(cv2.cvtColor(labeled_image, cv2.COLOR_BGR2RGB))
             plt.show()
         if save_images:
+            labeled_image = cv2.resize(labeled_image, dsize=(640, 480))
             cv2.imwrite(result_image_path, labeled_image)
     # when finish close all windows (when imshow with different window names)
     if show_images:
@@ -270,9 +320,12 @@ def detect_faces_in_images(images_folder, detector='onnx', recognizer='face_reco
             return faces_dict
 
 
-def detect_faces_in_videos(video_path=0, database='database/faces.db', detector='onnx', recognizer='face_recognition',
-                           lib='pil', classify_faces=False, show_landmarks=False):
+def load_face_recognizer(recognizer):
+    pass
 
+
+def detect_faces_in_videos(video_path=0, database='database/faces.db', detector='onnx', recognizer='facenet1',
+                           lib='pil', trans=0.5, classify_faces=False, show_landmarks=False):
     # Load face detector model
     if detector == 'onnx':
         onnx_path = "utilities/models/onnx/fixed_version-RFB-640.onnx"
@@ -282,7 +335,7 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
         print('face detector {} was loaded'.format(detector))
 
     # Load face recognizer model
-    if recognizer == 'facenet1' or recognizer == 'facenet':
+    if classify_faces and (recognizer == 'facenet1' or recognizer == 'facenet'):
         if recognizer == 'facenet': recognizer = 'facenet1'
         recognizer_check = 'siamese'
         similarity = 0.65
@@ -292,7 +345,7 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
         # https://drive.google.com/file/d/1971Xk5RwedbudGgTIrGAL4F7Aifu7id1/view?usp=sharing
         weights_path = "utilities/models/facenet1/facenet_weights.h5"
         facenet_model.load_weights(weights_path)
-    elif recognizer == 'facenet2':
+    elif classify_faces and recognizer == 'facenet2':
         recognizer_check = 'siamese'
         similarity = 0.60
         # https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
@@ -301,7 +354,7 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
         facenet_model = keras.models.load_model(facenet_path, compile=False)
     else:
         recognizer = 'face_recognition'
-        recognizer_check = 'compare' # or 'siamese'
+        recognizer_check = 'compare'  # or 'siamese'
         if recognizer_check != 'siamese':
             embeds_model = None
         similarity = 0.55 if recognizer_check == 'compare' else 0.6
@@ -309,9 +362,9 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
 
     # Load face similarity model
     if classify_faces and recognizer_check == 'siamese':
-        embeds_shape = (128, 1) # face_embeddings_database[0].shape
+        embeds_shape = (128, 1)  # face_embeddings_database[0].shape
         embeds_model = face_models.init_siamse_model((embeds_shape), app='embeds', learn='after_l2')
-        weights_path = "output/siamese_model/embeds_after_l2/"+recognizer+'_epoch_embeds_bs256_ep600_test_best.h5'
+        weights_path = "output/siamese_model/embeds_after_l2/" + recognizer + '_epoch_embeds_bs256_ep600_test_best.h5'
         embeds_model.load_weights(weights_path)
         print('face {} similarity model was loaded'.format('siamese'))
 
@@ -323,6 +376,7 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
 
     # Set report and loop parameters
     process_time = []
+    face_locations_previous = []
     cv2.namedWindow('Webcam', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('Webcam', 1600, 900)
     cv2.moveWindow('Webcam', 0, 0)
@@ -334,6 +388,7 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
 
         # Read a frame from the Webcam
         ret, frame = cap.read()
+        frame = cv2.resize(frame,dsize=(640, 480))
 
         # Start time
         start_time = time.time()
@@ -344,10 +399,49 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
             confidences, boxes = ort_session.run(None, {input_name: processed_frame})
             face_locations, labels, probs = onnx_predict(frame.shape[1], frame.shape[0], confidences, boxes, threshold)
             face_locations = onnx_order_face_locations(face_locations)
-            #labels_probs = [(f"face({probs[i]:.2f})") for i in range(len(face_locations))]
+            # labels_probs = [(f"face({probs[i]:.2f})") for i in range(len(face_locations))]
         elif detector == 'hog':
             face_locations = face_recognition.face_locations(frame)
-            #labels_probs = [(f"face(?)") for i in range(len(face_locations))]
+            # labels_probs = [(f"face(?)") for i in range(len(face_locations))]
+
+        #        def track_faces(current_face_locations, previous_face_locations):
+        #
+        #            face_locations = [0]*len(current_face_locations)
+        #            nearest_dist = [np.inf]*len(current_face_locations)
+        #            if len(current_face_locations) > 1 and len(previous_face_locations) > 0:
+        #                for i in range(len(current_face_locations)):
+        #                    top_c, right_c, bottom_c, left_c = current_face_locations[i]
+        #                    current_center = np.array([bottom_c-top_c, right_c-left_c])
+        #                    distance_ref = np.inf
+        #                    # nearest_index = 0
+        #                    for j in range(len(previous_face_locations))
+        #                        top_p, right_p, bottom_p, left_p = previous_face_locations[j]
+        #                        previous_center = np.array([bottom_p-top_p, right_p-left_p])
+        #                        distance = np.linalg.norm(current_center-previous_center)
+        #                        if distance < distance_ref:
+        #                            distance_ref = distance
+        #                            nearest_index = j
+        #                            nearest_dist = distance
+        #                    if face_locations[nearest_index] == 0:
+        #                        face_locations[nearest_index] = current_face_locations[i]
+        #                    else:
+        #                        # todo: we have to decide the colest between these two
+        #                        current_center = current_face_locations[i]
+        #                        previous_center = face_locations[nearest_index]
+        #                        face_locations[nearest_index+1] = current_face_locations[i]
+        #                    #previous_face_locations.pop(index_location)
+        #                    #face_locations.append()
+        #            else:
+        #                return current_face_locations
+        #
+        #            return face_locations
+        #
+        #        # Track faces todo: this is just a tracker to order
+        #        if not face_locations_previous:
+        #            face_locations_previous = face_locations
+        #        else:
+        #            face_locations = track_faces(face_locations, face_locations_previous)
+        #            face_locations_previous = face_locations
 
         # Create 'outsider' label for all detected faces
         labels_probs = ['outsider'] * len(face_locations)
@@ -360,12 +454,13 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
 
         # Calc face embeddings if requested (to recognize faces)
         if classify_faces and len(face_locations) > 0:
-            if recognizer == 'facenet' or recognizer == 'facenet1' or recognizer == 'facenet2':
+            if recognizer == 'facenet1' or recognizer == 'facenet2':
                 faces = facenet_preprocessing(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), face_locations)
                 face_embeddings = facenet_model.predict(faces)
-                face_embeddings = [face_embedding for face_embedding in face_embeddings]#.astype('float64')
+                face_embeddings = [face_embedding for face_embedding in face_embeddings]  # .astype('float64')
             elif recognizer == 'face_recognition':
-                face_embeddings = face_recognition.face_encodings(frame, known_face_locations=face_locations, model='small')
+                face_embeddings = face_recognition.face_encodings(frame, known_face_locations=face_locations,
+                                                                  model='small')
             # compare faces' embeddings with database embeddings to find matches
             face_labels = compare_faces(database, face_embeddings, method=recognizer_check, embeds_model=embeds_model,
                                         similarity=similarity)
@@ -383,7 +478,8 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
                                                  face_locations=face_locations,
                                                  face_landmarks=face_landmarks,
                                                  lib=lib,
-                                                 label_faces=True,
+                                                 trans=trans,
+                                                 label_faces=classify_faces,
                                                  show_points=False,
                                                  show_landmarks=show_landmarks)
 
@@ -396,7 +492,7 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
         if c == 27:
             break
         # press 'Space' to register a face in the database
-        elif c == 32 and len(face_locations) > 0 and database is not None:
+        elif c == 32 and classify_faces and len(face_locations) > 0 and database is not None:
             faces_dict = {'face': [], 'path': [], 'location': [], 'embedding': []}
             name = datetime.now().strftime('%Y/%m/%d-%H:%M:%S')
             for i in range(len(face_embeddings)):
@@ -419,14 +515,16 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
     print('Avg Proc Time [sec]: ', round(np.mean(process_time), 2))
 
 
-def save_faces_dict(image_path, face_numbers=None, label_option='select', database='database/faces.db', faces_dict=None):
+def save_faces_dict(image_path, face_numbers=None, label_option='select', database='database/faces.db',
+                    faces_dict=None):
     # todo: problems if a folder is provided!
     # label option: predefined
     if label_option == 'predefined' or label_option == 'all':
         # calc face dict for the image
         if faces_dict is None:
             faces_dict = detect_faces_in_images(image_path, detector='onnx', lib='pil', report=False, show_images=False,
-                                                save_images=False, label_faces=False, show_axes=False, save_face_dict=False,
+                                                save_images=False, show_axes=False,
+                                                save_face_dict=False,
                                                 show_landmarks=False, return_option='dict', classify_faces=False)
         if face_numbers is None and label_option != 'all':
             print('face_numbers argument was not defined, all faces will be saved!')
@@ -435,7 +533,7 @@ def save_faces_dict(image_path, face_numbers=None, label_option='select', databa
             if not isinstance(face_numbers, list):
                 face_numbers = [face_numbers]
             # edit index to match the dict
-            face_numbers = [i-1 for i in face_numbers]
+            face_numbers = [i - 1 for i in face_numbers]
         # save inputs flag
         if len(faces_dict['location']) > 0:
             inputs = 'y'
@@ -446,23 +544,24 @@ def save_faces_dict(image_path, face_numbers=None, label_option='select', databa
         # calc face dict for the image
         if faces_dict is None:
             faces_dict = detect_faces_in_images(image_path, detector='onnx', lib='pil', report=False, show_images=True,
-                                                save_images=False, label_faces=True, show_axes=False, save_face_dict=False,
+                                                save_images=False, show_axes=False,
+                                                save_face_dict=False,
                                                 show_landmarks=False, return_option='dict', classify_faces=False)
         num_faces = len(faces_dict['location'])
         if label_option == 'select':
             inputs = input('please select faces - list of face numbers (enter [n] to cancel): ')
             if inputs != 'n':
-                face_numbers = [int(i)-1 for i in re.split(r'\W+', inputs) if i is not '']
-            #labels = [0] * len(num_faces)
-            #for face_number in face_numbers:
+                face_numbers = [int(i) - 1 for i in re.split(r'\W+', inputs) if i is not '']
+            # labels = [0] * len(num_faces)
+            # for face_number in face_numbers:
             #    labels[face_number] = 1
         elif label_option == 'unselect':
             inputs = input('please unselect faces - list of face numbers: ')
             if inputs != 'n':
-                unselected_face_numbers = [int(i)-1 for i in re.split(r'\W+', inputs) if i is not '']
+                unselected_face_numbers = [int(i) - 1 for i in re.split(r'\W+', inputs) if i is not '']
                 face_numbers = [i for i in range(num_faces) if i not in unselected_face_numbers]
-            #labels = [1] * len(num_faces)
-            #for face_number in face_numbers:
+            # labels = [1] * len(num_faces)
+            # for face_number in face_numbers:
             #    labels[face_number] = 0
     else:
         print('Error: label_option argument is not recognized!')
@@ -481,7 +580,7 @@ def save_faces_dict(image_path, face_numbers=None, label_option='select', databa
                 selected_faces_dict[key].append(faces_dict[key][face_number])
         # save selected faces dict in database
         face_database.save(database, selected_faces_dict)
-        print('faces ({}) in image ({}) were saved successfully!'.format([i+1 for i in face_numbers], image_path))
+        print('faces ({}) in image ({}) were saved successfully!'.format([i + 1 for i in face_numbers], image_path))
         return True
     # cancel saving process
     elif inputs == 'n':
@@ -504,7 +603,7 @@ def train_face_classifier(database_path='faces.db'):
     print('face recognition classifier was trained successfully!')
 
 
-def compare_faces(database_path, face_embeddings, method='siamese', embeds_model=None, similarity=0.55): #best 0.55
+def compare_faces(database_path, face_embeddings, method='siamese', embeds_model=None, similarity=0.55):  # best 0.55
     face_dict_database = face_database.retrieve(database_path)
     face_embeddings_database = face_dict_database['embedding']
     face_labels = []
@@ -517,12 +616,13 @@ def compare_faces(database_path, face_embeddings, method='siamese', embeds_model
     if len(face_embeddings_database) > 0:
         if method == 'compare':
             for face_embedding in face_embeddings:
-                matches = face_recognition.compare_faces(face_embeddings_database, face_embedding, tolerance=1-similarity)
-                #name = "unknown"
+                matches = face_recognition.compare_faces(face_embeddings_database, face_embedding,
+                                                         tolerance=1 - similarity)
+                # name = "unknown"
                 if True in matches:
                     face_labels.append(1)
-                    #first_match_index = matches.index(True)
-                    #name = face_dict_database[first_match_index]
+                    # first_match_index = matches.index(True)
+                    # name = face_dict_database[first_match_index]
                 else:
                     face_labels.append(0)
         elif method == 'siamese':
@@ -533,14 +633,14 @@ def compare_faces(database_path, face_embeddings, method='siamese', embeds_model
                 # embeds_model.compile(loss="binary_crossentropy",optimizer=optimizer, metrics='accuracy')
                 weights_path = "output/siamese_model/weights/epoch_embeds_bs256_ep680_test_best.h5"
                 embeds_model.load_weights(weights_path)
-                #model_path = "output/siamese_model/epoch_embeds_bs256_ep680_test_best.h5"
-                #embeds_model = keras.models.load_model(model_path, compile=False)
+                # model_path = "output/siamese_model/epoch_embeds_bs256_ep680_test_best.h5"
+                # embeds_model = keras.models.load_model(model_path, compile=False)
             for face_embedding in face_embeddings:
                 length = len(face_embeddings_database)
                 h = face_embeddings[0].shape[0]
-                shape = (length,h,1)
+                shape = (length, h, 1)
                 pairs = [np.zeros(shape, dtype=float) for i in range(2)]
-                pairs[0] = np.tile(np.array(face_embedding), (length,1)).reshape(shape)
+                pairs[0] = np.tile(np.array(face_embedding), (length, 1)).reshape(shape)
                 pairs[1] = np.array(face_embeddings_database).reshape(shape)
                 probs = embeds_model.predict(pairs)
                 matches = [step_func(match) for match in probs]

@@ -5,7 +5,7 @@ import PIL.ImageFont
 import cv2
 
 
-def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil',
+def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil', trans=0.5,
                    label_faces=False, show_points=False, show_landmarks=False):
 
     # information about faces and images
@@ -26,7 +26,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         font_list = ["arial.ttf", "handwriting-markervalerieshand-regular.ttf", "Drawing_Guides.ttf"]
         font = PIL.ImageFont.truetype("input/fonts/" + font_list[0], 22)
         # transparancy
-        trans = int(255*0.5)
+        trans = int(255*trans) #int(255*0.5)
         # loop in face locations
         for i in range(len(face_locations)):
             # check if person registered
@@ -38,11 +38,8 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
                     labels_probs[i] = 'registered'
             # draw face locations
             top, right, bottom, left = face_locations[i]
-
             #draw.rectangle([left, top, right, bottom], fill=c, outline=c, width=5)
             draw.rectangle([left, top, right, bottom], fill=(100,100,100,trans), width=5)
-            rad = (right-left)*0.15
-            draw.ellipse((right-rad, top-rad, right+rad, top+rad), fill=c) # top right
             # show vertex points for debugging
             if show_points:
                 draw.ellipse((left - 5, top - 5, left + 5, top + 5), fill="yellow") # top left
@@ -51,6 +48,9 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
                 draw.ellipse((right - 5, bottom - 5, right + 5, bottom + 5), fill="black") # bottom right
             # show labels below face locations
             if label_faces:
+                # draw online/offline ellipse
+                rad = (right - left) * 0.15
+                draw.ellipse((right - rad, top - rad, right + rad, top + rad), fill=c)  # top right
                 # draw label box below face location
                 bottom_ = bottom + int(0.2 * (bottom - top))
                 #draw.rectangle([left, bottom, right, bottom_], fill=c, outline=c, width=5)

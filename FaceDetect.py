@@ -29,15 +29,17 @@ if __name__ == '__main__':
                               help="face detector ['facenet', 'face_recognition'] \n(default: 'facenet')")
     image_parser.add_argument('-lib', '--library', default='pil', type=str, metavar='',
                               help="image annotation library ['pil', 'cv2'] \n(default: 'pil')")
+    image_parser.add_argument('-tr', '--trans', default=0.5, type=float, metavar='',
+                              help="annotation transparency \n(default: 0.5)")
     image_parser.add_argument('-rp', '--report', default=True, type=bool, metavar='',
                               help="print report [True, False]")
     image_parser.add_argument('-sh', '--show', default=True, type=bool, metavar='',
                               help="show image [True, False]")
-    image_parser.add_argument('-s', '--save', default=False, type=bool, metavar='',
+    image_parser.add_argument('-s', '--save', default=False, action='store_true',
                               help="save processed images [True, False]")
-    image_parser.add_argument('-l', '--label', default=True, type=bool, metavar='',
-                              help="label faces [True, False]")
-    image_parser.add_argument('-a', '--axes', default=False, type=bool, metavar='',
+#    image_parser.add_argument('-l', '--label', default=False, action='store_true',
+#                              help="label faces [True, False]")
+    image_parser.add_argument('-a', '--axes', default=False, action='store_true',
                               help="show axes [True, False]")
     image_parser.add_argument('-lm', '--landmarks', default=False, type=bool, metavar='',
                               help="show faces landmarks [True, False]")
@@ -45,7 +47,7 @@ if __name__ == '__main__':
                               help="save faces dictionary [True, False]")
     image_parser.add_argument('-ro', '--return_option', default='locations', type=str, metavar='',
                               help="classify faces [True, False]")
-    image_parser.add_argument('-c', '--classify', default=False, type=bool, metavar='',
+    image_parser.add_argument('-c', '--classify', default=False,  action='store_true',
                               help="classify faces [True, False]")
 
     # Option 2: video
@@ -62,6 +64,8 @@ if __name__ == '__main__':
                               help="face detector ['face_recognition', 'facenet1', 'facenet2'] \n(default: 'facenet1')")
     video_parser.add_argument('-lib', '--library', default='pil', type=str, metavar='',
                               help="image annotation library ['pil', 'cv2'] \n(default: 'pil')")
+    video_parser.add_argument('-tr', '--trans', default=0.5, type=float, metavar='',
+                              help="annotation transparency \n(default: 0.5)")
     video_parser.add_argument('-c', '--classify', default=False, action='store_true',
                               help="classify faces")
     video_parser.add_argument('-lm', '--landmarks', default=False, action='store_true',
@@ -70,13 +74,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.option in ['i', 'image', 'images']:
         face_detect.detect_faces_in_images(images_folder=args.path,
+                                           database=args.database,
                                            detector=args.detector,
                                            recognizer=args.recognizer,
                                            lib=args.library,
+                                           trans=args.trans,
                                            report=args.report,
                                            show_images=args.show,
                                            save_images=args.save,
-                                           label_faces=args.label,
+                                           #label_faces=args.label,
                                            show_axes=args.axes,
                                            show_landmarks=args.landmarks,
                                            save_face_dict=args.save_dict,
@@ -94,5 +100,6 @@ if __name__ == '__main__':
                                            detector=args.detector,
                                            recognizer=args.recognizer,
                                            lib=args.library,
+                                           trans=args.trans,
                                            classify_faces=args.classify,
                                            show_landmarks=args.landmarks)
