@@ -106,7 +106,12 @@ def facenet_preprocessing(frame, face_locations=None):
 def detect_faces_in_images(images_folder, database='database/faces.db', detector='onnx', recognizer='facenet',
                            lib='pil', trans=0.5, report=True, show_images=True, save_images=True,
                            show_axes=False, show_landmarks=False, save_face_dict=False,
-                           return_option='locations', classify_faces=False):
+                           return_option=None, classify_faces=False):
+
+    # if option save_face_dict, then classify faces to check if they are registered or not
+    if save_face_dict:
+        classify_faces=True
+
     # load the detector if requested (0.04 sec to load)
     if detector == 'onnx':
         label_path = "utilities/models/voc-model-labels.txt"
@@ -119,13 +124,13 @@ def detect_faces_in_images(images_folder, database='database/faces.db', detector
         ort_session = ort.InferenceSession(onnx_path)
         input_name = ort_session.get_inputs()[0].name
         threshold = 0.8
-        if report: print('Face detector (onnx) was loaded (threshold={})'.format(threshold))
+        print('Face detector (onnx) was loaded (threshold={})'.format(threshold))
 
     # Load face recognizer model
     if classify_faces and (recognizer == 'facenet1' or recognizer == 'facenet'):
         if recognizer == 'facenet': recognizer = 'facenet1'
         recognizer_check = 'siamese'
-        similarity = 0.65
+        similarity = 0.90
         # https://sefiks.com/2018/09/03/face-recognition-with-facenet-in-keras/
         # https://github.com/serengil/tensorflow-101/blob/master/model/inception_resnet_v1.py
         facenet_model = InceptionResNetV1()
@@ -237,13 +242,6 @@ def detect_faces_in_images(images_folder, database='database/faces.db', detector
         # calc face embeddings if requested
         if (return_option == 'embeddings' or return_option == 'dict' or classify_faces or save_face_dict) and \
                 len(face_locations) > 0:
-            if recognizer == 'facenet':
-                faces = facenet_preprocessing(image, face_locations)
-                face_embeddings = facenet_model.predict(faces)
-                face_embeddings = [face_embedding.astype('float32') for face_embedding in face_embeddings]
-            elif recognizer == 'face_recognition':
-                face_embeddings = face_recognition.face_encodings(image, known_face_locations=face_locations,
-                                                                  model='small')
 
             if recognizer == 'facenet1' or recognizer == 'facenet2':
                 faces = facenet_preprocessing(image, face_locations)
@@ -265,9 +263,14 @@ def detect_faces_in_images(images_folder, database='database/faces.db', detector
                 faces_dict['path'].append(image_path)
                 faces_dict['location'].append(face_locations[i])
                 faces_dict['embedding'].append(face_embeddings[i])
+
         # save face dict in database:
         if save_face_dict:  # and not path_flag:
-            save_faces_dict(image_path=image_path, label_option=label_option, faces_dict=faces_dict)
+            save_faces_dict(image_path=image_path, label_option=label_option, faces_dict=faces_dict,
+                            detector=detector, recognizer=recognizer)
+            # update face labels, to include newly registered faces
+            face_labels = compare_faces(database, face_embeddings, method=recognizer_check, embeds_model=embeds_model,
+                                        similarity=similarity)
 
         # add face calc processing time (locations, embeddings, landmarks)
         process_time.append(round(time.time() - start_time, 2))
@@ -318,6 +321,8 @@ def detect_faces_in_images(images_folder, database='database/faces.db', detector
         elif return_option == 'dict':
             if report: print('face dict is returned!')
             return faces_dict
+        else:
+            return None
 
 
 def load_face_recognizer(recognizer):
@@ -338,7 +343,7 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
     if classify_faces and (recognizer == 'facenet1' or recognizer == 'facenet'):
         if recognizer == 'facenet': recognizer = 'facenet1'
         recognizer_check = 'siamese'
-        similarity = 0.65
+        similarity = 0.90
         # https://sefiks.com/2018/09/03/face-recognition-with-facenet-in-keras/
         # https://github.com/serengil/tensorflow-101/blob/master/model/inception_resnet_v1.py
         facenet_model = InceptionResNetV1()
@@ -516,16 +521,16 @@ def detect_faces_in_videos(video_path=0, database='database/faces.db', detector=
 
 
 def save_faces_dict(image_path, face_numbers=None, label_option='select', database='database/faces.db',
-                    faces_dict=None):
+                    faces_dict=None, detector='onnx', recognizer='facenet1'):
     # todo: problems if a folder is provided!
     # label option: predefined
     if label_option == 'predefined' or label_option == 'all':
         # calc face dict for the image
         if faces_dict is None:
-            faces_dict = detect_faces_in_images(image_path, detector='onnx', lib='pil', report=False, show_images=False,
-                                                save_images=False, show_axes=False,
-                                                save_face_dict=False,
-                                                show_landmarks=False, return_option='dict', classify_faces=False)
+            faces_dict = detect_faces_in_images(image_path, detector=detector, recognizer=recognizer,
+                                                lib='pil', report=False, show_images=False, save_images=False,
+                                                show_axes=False, save_face_dict=False, show_landmarks=False,
+                                                return_option='dict', classify_faces=False)
         if face_numbers is None and label_option != 'all':
             print('face_numbers argument was not defined, all faces will be saved!')
         elif face_numbers:
@@ -541,12 +546,18 @@ def save_faces_dict(image_path, face_numbers=None, label_option='select', databa
             inputs = 'n'
     # label option: selective
     elif label_option == 'select' or label_option == 'unselect':
-        # calc face dict for the image
+        # if faces_dict was not provided, calc face dict for the image
         if faces_dict is None:
-            faces_dict = detect_faces_in_images(image_path, detector='onnx', lib='pil', report=False, show_images=True,
-                                                save_images=False, show_axes=False,
-                                                save_face_dict=False,
-                                                show_landmarks=False, return_option='dict', classify_faces=False)
+            faces_dict = detect_faces_in_images(image_path, detector=detector, recognizer=recognizer,
+                                   lib='pil', report=False, show_images=True, save_images=False,
+                                   show_axes=False, save_face_dict=False, show_landmarks=False,
+                                   return_option='dict', classify_faces=False)
+        # if faces_dict was provided, then just show the image with labels
+        else:
+            detect_faces_in_images(image_path, detector=detector, recognizer=recognizer,
+                                   lib='pil', report=False, show_images=True, save_images=True,
+                                   show_axes=False, save_face_dict=False, show_landmarks=False,
+                                   return_option=None, classify_faces=True)
         num_faces = len(faces_dict['location'])
         if label_option == 'select':
             inputs = input('please select faces - list of face numbers (enter [n] to cancel): ')

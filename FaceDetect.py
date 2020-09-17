@@ -25,7 +25,7 @@ if __name__ == '__main__':
                               help='image file or folder path')
     image_parser.add_argument('-m', '--detector', default='onnx', type=str, metavar='',
                               help="face detector ['onnx', 'hog']")
-    image_parser.add_argument('-r', '--recognizer', default='face_recognition', type=str, metavar='',
+    image_parser.add_argument('-r', '--recognizer', default='facenet', type=str, metavar='',
                               help="face detector ['facenet', 'face_recognition'] \n(default: 'facenet')")
     image_parser.add_argument('-lib', '--library', default='pil', type=str, metavar='',
                               help="image annotation library ['pil', 'cv2'] \n(default: 'pil')")
@@ -41,9 +41,9 @@ if __name__ == '__main__':
 #                              help="label faces [True, False]")
     image_parser.add_argument('-a', '--axes', default=False, action='store_true',
                               help="show axes [True, False]")
-    image_parser.add_argument('-lm', '--landmarks', default=False, type=bool, metavar='',
+    image_parser.add_argument('-lm', '--landmarks', default=False,  action='store_true',
                               help="show faces landmarks [True, False]")
-    image_parser.add_argument('-d', '--save_dict', default=False, type=bool, metavar='',
+    image_parser.add_argument('-d', '--save_dict', default=False, action='store_true',
                               help="save faces dictionary [True, False]")
     image_parser.add_argument('-ro', '--return_option', default='locations', type=str, metavar='',
                               help="classify faces [True, False]")
@@ -60,7 +60,7 @@ if __name__ == '__main__':
                                    "\n(default: path=0: Webcam)")
     video_parser.add_argument('-m', '--detector', default='onnx', type=str, metavar='',
                               help="face detector ['onnx', 'hog'] \n(default: 'onnx')")
-    video_parser.add_argument('-r', '--recognizer', default='facenet2', type=str, metavar='',
+    video_parser.add_argument('-r', '--recognizer', default='facenet1', type=str, metavar='',
                               help="face detector ['face_recognition', 'facenet1', 'facenet2'] \n(default: 'facenet1')")
     video_parser.add_argument('-lib', '--library', default='pil', type=str, metavar='',
                               help="image annotation library ['pil', 'cv2'] \n(default: 'pil')")
