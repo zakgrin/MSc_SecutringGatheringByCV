@@ -25,7 +25,7 @@ if __name__ == '__main__':
                               help='image file or folder path')
     image_parser.add_argument('-m', '--detector', default='onnx', type=str, metavar='',
                               help="face detector ['onnx', 'hog']")
-    image_parser.add_argument('-r', '--recognizer', default='facenet', type=str, metavar='',
+    image_parser.add_argument('-r', '--recognizer', default='facenet1', type=str, metavar='',
                               help="face detector ['facenet', 'face_recognition'] \n(default: 'facenet')")
     image_parser.add_argument('-lib', '--library', default='pil', type=str, metavar='',
                               help="image annotation library ['pil', 'cv2'] \n(default: 'pil')")
