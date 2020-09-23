@@ -126,39 +126,43 @@ def detect_faces_in_images(images_folder, database='database/faces.db', detector
         threshold = 0.7
         print('Face detector (onnx) was loaded (threshold={})'.format(threshold))
 
-    # Load face recognizer model
-    if classify_faces and (recognizer == 'facenet1' or recognizer == 'facenet'):
-        if recognizer == 'facenet': recognizer = 'facenet1'
-        recognizer_check = 'siamese'
-        similarity = 0.60
-        # https://sefiks.com/2018/09/03/face-recognition-with-facenet-in-keras/
-        # https://github.com/serengil/tensorflow-101/blob/master/model/inception_resnet_v1.py
-        facenet_model = InceptionResNetV1()
-        # https://drive.google.com/file/d/1971Xk5RwedbudGgTIrGAL4F7Aifu7id1/view?usp=sharing
-        weights_path = "utilities/models/facenet1/facenet_weights.h5"
-        facenet_model.load_weights(weights_path)
-    elif classify_faces and recognizer == 'facenet2':
-        recognizer_check = 'siamese'
-        similarity = 0.60
-        # https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
-        # https://github.com/nyoki-mtl/keras-facenet
-        facenet_path = "utilities/models/facenet2/facenet_keras.h5"
-        facenet_model = keras.models.load_model(facenet_path, compile=False)
-    else:
-        recognizer = 'face_recognition'
-        recognizer_check = 'compare'  # or 'siamese'
-        if recognizer_check != 'siamese':
-            embeds_model = None
-        similarity = 0.55 if recognizer_check == 'compare' else 0.6
-    print('face recognizer ({}) was loaded'.format(recognizer))
+    # Face Recognition:
+    if classify_faces:
+        # Load face embeddings from the database
+        face_dict_database = face_database.retrieve(database)
+        face_embeddings_database = face_dict_database['embedding']
+        similarity = 0.7
 
-    # Load face similarity model
-    if classify_faces and recognizer_check == 'siamese':
-        embeds_shape = (128, 1)  # face_embeddings_database[0].shape
-        embeds_model = face_models.init_siamse_model((embeds_shape), app='embeds', learn='after_l2')
-        weights_path = "output/siamese_model/embeds_after_l2/" + recognizer + '_epoch_embeds_bs256_ep600_test_best.h5'
-        embeds_model.load_weights(weights_path)
-        print('face {} similarity model was loaded'.format('siamese'))
+        # Load face recognizer model
+        if recognizer == 'facenet1' or recognizer == 'facenet':
+            recognizer_check = 'siamese'
+            # https://sefiks.com/2018/09/03/face-recognition-with-facenet-in-keras/
+            # https://github.com/serengil/tensorflow-101/blob/master/model/inception_resnet_v1.py
+            facenet_model = InceptionResNetV1()
+            # https://drive.google.com/file/d/1971Xk5RwedbudGgTIrGAL4F7Aifu7id1/view?usp=sharing
+            weights_path = "utilities/models/facenet1/facenet_weights.h5"
+            facenet_model.load_weights(weights_path)
+        elif classify_faces and recognizer == 'facenet2':
+            recognizer_check = 'siamese'
+            # https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
+            # https://github.com/nyoki-mtl/keras-facenet
+            facenet_path = "utilities/models/facenet2/facenet_keras.h5"
+            facenet_model = keras.models.load_model(facenet_path, compile=False)
+        else:
+            recognizer = 'face_recognition'
+            recognizer_check = 'siamese' # or 'compare'
+            if recognizer_check != 'siamese':
+                embeds_model = None
+            similarity = 0.55 if recognizer_check == 'compare' else similarity
+        print('face recognizer ({}) was loaded'.format(recognizer))
+
+        # Load face similarity model
+        if recognizer_check == 'siamese':
+            embeds_shape = (128, 1)  # face_embeddings_database[0].shape
+            embeds_model = face_models.init_siamse_model((embeds_shape), app='embeds', learn='after_l2')
+            weights_path = "output/siamese_model/embeds_after_l2/" + recognizer + '_epoch_embeds_bs256_ep600_test_best.h5'
+            embeds_model.load_weights(weights_path)
+            print('face similarity model was loaded: {} for {}'.format(recognizer_check, recognizer))
 
     # to calc processing time
     process_time = []
@@ -269,8 +273,8 @@ def detect_faces_in_images(images_folder, database='database/faces.db', detector
             save_faces_dict(image_path=image_path, label_option=label_option, faces_dict=faces_dict,
                             detector=detector, recognizer=recognizer)
             # update face labels, to include newly registered faces
-            face_labels = compare_faces(database, face_embeddings, method=recognizer_check, embeds_model=embeds_model,
-                                        similarity=similarity)
+            face_labels = compare_faces(face_embeddings_database, face_embeddings, method=recognizer_check,
+                                        embeds_model=embeds_model, similarity=similarity)
 
         # add face calc processing time (locations, embeddings, landmarks)
         process_time.append(round(time.time() - start_time, 2))
