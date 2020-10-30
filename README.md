@@ -61,12 +61,16 @@ To try these models on an image file using our system, the following command lin
 >>> python FaceDetect.py image --path=input/imgs/crowd.jpg --trans=1 --detector=hog --save
 ```
 This will run the Python program named \verb|FaceDetect.py| with \verb|image| as an argument with the following options: 
-    - `--path`: to enter the image path.
-    - `--save`: to save the results.
-    - `--trans`: to specify face mask transparency.
-    - `--detector`: to specify the face detector `hog` or `rbf`.
+- `--path`: to enter the image path.
+- `--save`: to save the results.
+- `--trans`: to specify face mask transparency.
+- `--detector`: to specify the face detector `hog` or `rbf`.
 
-
+The Python program [FaceDetect.py](FaceDetect.py) with argument `image` calls 
+[utilities/face_detect.py](utilities/face_detect.py) and uses `detect_faces_in_images()` function. This function opens 
+the image file and then run the face detector to find face locations. Consequently, bounding boxes around faces are 
+drawn as face masks using another function called `face_locations()` under 
+[utilities/face_draw.py](utilities/face_draw.py) . 
 
 ## References
 1. [Face Recognition](https://github.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB)
