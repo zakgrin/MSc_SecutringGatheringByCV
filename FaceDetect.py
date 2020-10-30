@@ -37,6 +37,8 @@ if __name__ == '__main__':
                               help="show image [True, False]")
     image_parser.add_argument('-s', '--save', default=False, action='store_true',
                               help="save processed images [True, False]")
+    image_parser.add_argument('-f', '--find', default='registered', type=str, metavar='',
+                          help="find faces ['registered', 'outsider'] \n(default: 'registered')")
 #    image_parser.add_argument('-l', '--label', default=False, action='store_true',
 #                              help="label faces [True, False]")
     image_parser.add_argument('-a', '--axes', default=False, action='store_true',
@@ -66,6 +68,10 @@ if __name__ == '__main__':
                               help="image annotation library ['pil', 'cv2'] \n(default: 'pil')")
     video_parser.add_argument('-tr', '--trans', default=0.5, type=float, metavar='',
                               help="annotation transparency \n(default: 0.5)")
+    video_parser.add_argument('-f', '--find', default='registered', type=str, metavar='',
+                              help="find faces ['registered', 'outsider'] \n(default: 'registered')")
+    video_parser.add_argument('-s', '--save', default=False, action='store_true',
+                              help="save processed videos [True, False]")
     video_parser.add_argument('-c', '--classify', default=False, action='store_true',
                               help="classify faces")
     video_parser.add_argument('-lm', '--landmarks', default=False, action='store_true',
@@ -87,7 +93,8 @@ if __name__ == '__main__':
                                            show_landmarks=args.landmarks,
                                            save_face_dict=args.save_dict,
                                            return_option=args.return_option,
-                                           classify_faces=args.classify)
+                                           classify_faces=args.classify,
+                                           find=args.find)
 
     elif args.option in ['v', 'video', 'videos']:
         if args.path == '0':
@@ -102,4 +109,6 @@ if __name__ == '__main__':
                                            lib=args.library,
                                            trans=args.trans,
                                            classify_faces=args.classify,
-                                           show_landmarks=args.landmarks)
+                                           show_landmarks=args.landmarks,
+                                           save=args.save,
+                                           find=args.find)

@@ -14,6 +14,7 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
     labels_probs = report_dict['labels_probs']
     channels = report_dict['channels']
     face_labels = report_dict['face_labels']
+    find = report_dict['find']
 
     if lib == 'pil':
         # if BGR: convert to RGB
@@ -27,15 +28,21 @@ def face_locations(image, report_dict, face_locations, face_landmarks, lib='pil'
         font = PIL.ImageFont.truetype("input/fonts/" + font_list[0], 22)
         # transparancy
         trans = int(255*trans) #int(255*0.5)
+        if find == 'registered':
+            everyone_c = (255,0,0,trans) #"red"
+            target_c = (0,255,0,trans) #"green"
+        elif find == 'outsider':
+            everyone_c = (0, 255, 0, trans)  #"green"
+            target_c = (255,0,0,trans) #"red"
+
         # loop in face locations
         for i in range(len(face_locations)):
-            # check if person registered
-            c = (255,0,0,trans) #"red"
+            c = everyone_c
             # If face_labels is not None, then convert Trues into green color with registered label
             if face_labels:
                 if face_labels[i]:
-                    c = (0,255,0,trans) #"green"
-                    labels_probs[i] = 'registered'
+                    c = target_c
+                    labels_probs[i] = find
             # draw face locations
             top, right, bottom, left = face_locations[i]
             #draw.rectangle([left, top, right, bottom], fill=c, outline=c, width=5)
